@@ -15,7 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _apiService = ApiService(baseUrl: 'http://192.168.88.39:8080');
+  final _apiService = ApiService(baseUrl: 'http://192.168.88.24:8080');
   
   bool _isLoading = false;
   String _errorMessage = '';

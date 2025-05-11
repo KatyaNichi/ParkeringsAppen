@@ -1,11 +1,26 @@
-import 'dart:convert';
-
+// lib/screens/parkings_screen.dart
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+// Import BLoC classes
+import 'package:parking_app_flutter/blocs/parking/parking_bloc.dart';
+import 'package:parking_app_flutter/blocs/parking/parking_event.dart';
+import 'package:parking_app_flutter/blocs/parking/parking_state.dart';
+
+import 'package:parking_app_flutter/blocs/parking_space/parking_space_bloc.dart';
+import 'package:parking_app_flutter/blocs/parking_space/parking_space_event.dart';
+import 'package:parking_app_flutter/blocs/parking_space/parking_space_state.dart';
+
+import 'package:parking_app_flutter/blocs/vehicle/vehicle_bloc.dart';
+import 'package:parking_app_flutter/blocs/vehicle/vehicle_event.dart';
+import 'package:parking_app_flutter/blocs/vehicle/vehicle_state.dart';
+
+// Import models
 import 'package:parking_app_flutter/models/parking.dart';
 import 'package:parking_app_flutter/models/parking_space.dart';
 import 'package:parking_app_flutter/models/vehicle.dart';
-import 'package:parking_app_flutter/services/api_service.dart';
+
+// Import services
 import 'package:parking_app_flutter/services/user_service.dart';
 
 class ParkingsScreen extends StatefulWidget {
@@ -15,48 +30,44 @@ class ParkingsScreen extends StatefulWidget {
   _ParkingsScreenState createState() => _ParkingsScreenState();
 }
 
+
 class _ParkingsScreenState extends State<ParkingsScreen>
     with SingleTickerProviderStateMixin {
-  final _apiService = ApiService(baseUrl: 'http://192.168.88.39:8080');
-  bool _isLoading = true;
-  String _errorMessage = '';
-
+  late TabController _tabController;
   List<ParkingSpace> _parkingSpaces = [];
   List<Vehicle> _userVehicles = [];
   List<Parking> _parkingHistory = [];
   List<Parking> _activeParkings = [];
+  bool _isLoading = false;
+  String _errorMessage = '';
 
-  late TabController _tabController;
-
-@override
-void initState() {
-  super.initState();
-  
-  // Initialize the tab controller with 2 tabs
-  _tabController = TabController(length: 2, vsync: this);
-  
-  // Check if user is logged in
-  final currentUser = UserService().currentUser;
-  if (currentUser == null) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ingen användare inloggad. Logga in igen.'),
-          duration: Duration(seconds: 3),
-        ),
-      );
-      
-      // Redirect to login
-      Navigator.pushReplacementNamed(context, '/');
-    });
-    return;
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    
+    // Check if user is logged in
+    final currentUser = UserService().currentUser;
+    if (currentUser == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ingen användare inloggad. Logga in igen.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        
+        // Redirect to login
+        Navigator.pushReplacementNamed(context, '/');
+      });
+      return;
+    }
+    
+    // Load data
+    _loadData();
   }
-  
-  // Continue with normal initialization
-  _loadData();
-}
 
-  // Load all necessary data
+  // Load all necessary data using BLoCs
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
@@ -64,13 +75,21 @@ void initState() {
     });
 
     try {
-      // Load parking spaces, user vehicles, active parkings and parking history
-      await Future.wait([
-        _loadParkingSpaces(),
-        _loadUserVehicles(),
-        _loadParkingHistory(),
-        _loadActiveParkings(),
-      ]);
+      // Get the current user
+      final currentUser = UserService().currentUser;
+      if (currentUser != null) {
+        // Load user vehicles
+        context.read<VehicleBloc>().add(LoadVehiclesByOwner(currentUser.id));
+      }
+
+      // Load parking spaces
+      context.read<ParkingSpaceBloc>().add(LoadParkingSpaces());
+
+      // Load active parkings
+      context.read<ParkingBloc>().add(LoadActiveParkings());
+
+      // Load all parkings (for history)
+      context.read<ParkingBloc>().add(LoadParkings());
 
       setState(() {
         _isLoading = false;
@@ -83,195 +102,46 @@ void initState() {
     }
   }
 
-  // Load available parking spaces
-  Future<void> _loadParkingSpaces() async {
-    try {
-      final spacesData = await _apiService.getList('/api/parkingSpaces');
-      setState(() {
-        _parkingSpaces =
-            spacesData
-                .map<ParkingSpace>((data) => ParkingSpace.fromJson(data))
-                .toList();
-      });
-    } catch (e) {
-      throw Exception('Kunde inte ladda parkeringsplatser: $e');
-    }
-  }
-
-  // Load user's vehicles
- Future<void> _loadUserVehicles() async {
-  try {
-    // Get current user
-    final currentUser = UserService().currentUser;
-    if (currentUser == null) {
-      throw Exception('Ingen användare inloggad');
-    }
+  // End a parking
+  Future<void> _endParking(Parking parking) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Avsluta parkering'),
+        content: const Text('Är du säker på att du vill avsluta denna parkering?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Avbryt'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Avsluta', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
     
-    final vehiclesData = await _apiService.getList('/api/vehicles/owner/${currentUser.id}');
-    setState(() {
-      _userVehicles = vehiclesData.map<Vehicle>((data) => Vehicle.fromJson(data)).toList();
-    });
-  } catch (e) {
-    throw Exception('Kunde inte ladda fordon: $e');
-  }
-}
-
-  // Load parking history
- Future<void> _loadParkingHistory() async {
-  try {
-    final parkingsData = await _apiService.getList('/api/parkings');
-    final currentUser = UserService().currentUser;
+    if (confirm != true) return;
     
-    // Get the user's vehicle IDs as strings
-    final userVehicleIds = _userVehicles.map((v) => v.id.toString()).toSet();
-    
-    setState(() {
-      // Only include parkings for the user's vehicles and with an end time
-      _parkingHistory = parkingsData
-          .map<Parking>((data) => Parking.fromJson(data))
-          .where((parking) => 
-              parking.endTime != null && 
-              userVehicleIds.contains(parking.fordon))
-          .toList();
-    });
-  } catch (e) {
-    throw Exception('Kunde inte ladda parkeringshistorik: $e');
-  }
-}
-
-  // Load active parkings
-  Future<void> _loadActiveParkings() async {
-    try {
-      final activeParkingsData = await _apiService.getList(
-        '/api/parkings/active',
-      );
-      setState(() {
-        _activeParkings =
-            activeParkingsData
-                .map<Parking>((data) => Parking.fromJson(data))
-                .toList();
-      });
-    } catch (e) {
-      throw Exception('Kunde inte ladda aktiva parkeringar: $e');
-    }
-  }
-
-
-Future<void> _endParking(Parking parking) async {
-  final confirm = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Avsluta parkering'),
-      content: const Text('Är du säker på att du vill avsluta denna parkering?'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Avbryt'),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-          onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Avsluta', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ),
-  );
-  
-  if (confirm != true) return;
-  
-  setState(() => _isLoading = true);
-  
-  try {
     // Format current time as HH:MM
     final now = DateTime.now();
     final endTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     
-    // Use the correct endpoint URL for ending a parking
-    final response = await http.put(
-      Uri.parse('${_apiService.baseUrl}/api/parkings/${parking.id}/end'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({"endTime": endTime}),
-    );
-    
-    if (response.statusCode == 200) {
-      // Remove this parking from active parkings
-      setState(() {
-        _activeParkings.removeWhere((p) => p.id == parking.id);
-      });
-      
-      // Reload data to update the history
-      await _loadParkingHistory();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Parkering avslutad')),
-      );
-    } else {
-      throw Exception('Failed to end parking: ${response.body}');
-    }
-    
-    setState(() => _isLoading = false);
-  } catch (e) {
-    setState(() {
-      _isLoading = false;
-      _errorMessage = 'Kunde inte avsluta parkering: $e';
-    });
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Kunde inte avsluta parkering: $e')),
-    );
+    // Dispatch the event to end the parking
+    context.read<ParkingBloc>().add(EndParking(
+      parkingId: parking.id,
+      endTime: endTime,
+    ));
   }
-}
 
   @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_errorMessage.isNotEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              _errorMessage,
-              style: const TextStyle(color: Colors.red),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadData,
-              child: const Text('Försök igen'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        TabBar(
-          controller: _tabController,
-          labelColor: const Color(0xFF0078D7),
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: const Color(0xFF0078D7),
-          tabs: const [Tab(text: 'Aktiva parkeringar'), Tab(text: 'Historik')],
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [_buildActiveParkingsTab(), _buildParkingHistoryTab()],
-          ),
-        ),
-      ],
-    );
-  }
-
   // Tab for displaying active parkings
   Widget _buildActiveParkingsTab() {
     return RefreshIndicator(
       onRefresh: () async {
-        await _loadActiveParkings();
+        context.read<ParkingBloc>().add(LoadActiveParkings());
       },
       child:
           _activeParkings.isEmpty
@@ -285,27 +155,16 @@ Future<void> _endParking(Parking parking) async {
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
-  style: ElevatedButton.styleFrom(
-    backgroundColor: const Color(0xFF0078D7),
-    foregroundColor: Colors.white,
-  ),
-  onPressed: () {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hitta parkeringsplats'),
-        content: const Text('Gå till fliken "Parkeringsplatser" för att hitta och välja en tillgänglig parkeringsplats.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  },
-  child: const Text('Hitta parkeringsplats'),
-),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0078D7),
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () {
+                        // Navigate to the ParkingSpacesScreen
+                        _tabController.animateTo(0); // Switch to first tab in parent screen
+                      },
+                      child: const Text('Hitta parkeringsplats'),
+                    ),
                   ],
                 ),
               )
@@ -322,7 +181,7 @@ Future<void> _endParking(Parking parking) async {
                           id: -1,
                           type: 'Okänt fordon',
                           registrationNumber: 0,
-                          owner: _userVehicles.first.owner,
+                          owner: _userVehicles.isNotEmpty ? _userVehicles.first.owner : null!,
                         ),
                   );
 
@@ -392,7 +251,7 @@ Future<void> _endParking(Parking parking) async {
   Widget _buildParkingHistoryTab() {
     return RefreshIndicator(
       onRefresh: () async {
-        await _loadParkingHistory();
+        context.read<ParkingBloc>().add(LoadParkings());
       },
       child:
           _parkingHistory.isEmpty
@@ -525,4 +384,111 @@ Future<void> _endParking(Parking parking) async {
     _tabController.dispose();
     super.dispose();
   }
-}
+  
+  Widget build(BuildContext context) {
+    // Listen to BLoC states to update the local data
+    return MultiBlocListener(
+      listeners: [
+        // Listen to VehicleBloc
+        BlocListener<VehicleBloc, VehicleState>(
+          listener: (context, state) {
+            if (state is VehicleLoaded) {
+              setState(() {
+                _userVehicles = state.vehicles;
+              });
+            } else if (state is VehicleError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(state.message), backgroundColor: Colors.red),
+              );
+            }
+          },
+        ),
+        // Listen to ParkingSpaceBloc
+        BlocListener<ParkingSpaceBloc, ParkingSpaceState>(
+          listener: (context, state) {
+            if (state is ParkingSpaceLoaded) {
+              setState(() {
+                _parkingSpaces = state.parkingSpaces;
+              });
+            } else if (state is ParkingSpaceError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(state.message), backgroundColor: Colors.red),
+              );
+            }
+          },
+        ),
+        // Listen to ParkingBloc
+        BlocListener<ParkingBloc, ParkingState>(
+          listener: (context, state) {
+            if (state is ParkingLoaded) {
+              setState(() {
+                _parkingHistory = state.parkings.where((p) => p.endTime != null).toList();
+              });
+            } else if (state is ActiveParkingsLoaded) {
+              setState(() {
+                _activeParkings = state.activeParkings;
+              });
+            } else if (state is ParkingError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(state.message), backgroundColor: Colors.red),
+              );
+            } else if (state is ParkingOperationSuccess) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(state.message)),
+              );
+            }
+          },
+        ),
+      ],
+      child: BlocBuilder<ParkingBloc, ParkingState>(
+        builder: (context, state) {
+          if (_isLoading || state is ParkingLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (_errorMessage.isNotEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _errorMessage,
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadData,
+                    child: const Text('Försök igen'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return Column(
+            children: [
+              TabBar(
+                controller: _tabController,
+                labelColor: const Color(0xFF0078D7),
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: const Color(0xFF0078D7),
+                tabs: const [
+                  Tab(text: 'Aktiva parkeringar'), 
+                  Tab(text: 'Historik')
+                ],
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildActiveParkingsTab(), 
+                    _buildParkingHistoryTab()
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );}}

@@ -1,3 +1,4 @@
+// lib/models/parking_space.dart
 class ParkingSpace {
   final int id;
   final String adress;
@@ -9,34 +10,21 @@ class ParkingSpace {
     required this.pricePerHour,
   });
 
-  // Create a ParkingSpace from JSON
+  // Factory constructor to create a ParkingSpace from JSON
   factory ParkingSpace.fromJson(Map<String, dynamic> json) {
     return ParkingSpace(
-      id: json['id'],
-      adress: json['adress'],
-      pricePerHour: json['pricePerHour'],
+      id: json['id'] as int,
+      adress: json['adress'] as String,
+      pricePerHour: json['pricePerHour'] as int,
     );
   }
 
-  // Convert ParkingSpace to JSON
+  // Convert a ParkingSpace to JSON
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'adress': adress,
       'pricePerHour': pricePerHour,
     };
-  }
-
-  // Create a copy of the ParkingSpace with possible updates
-  ParkingSpace copyWith({
-    int? id,
-    String? adress,
-    int? pricePerHour,
-  }) {
-    return ParkingSpace(
-      id: id ?? this.id,
-      adress: adress ?? this.adress,
-      pricePerHour: pricePerHour ?? this.pricePerHour,
-    );
   }
 }

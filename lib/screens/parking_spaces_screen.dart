@@ -1,6 +1,10 @@
+// lib/screens/parking_spaces_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:parking_app_flutter/blocs/parking_space/parking_space_bloc.dart';
+import 'package:parking_app_flutter/blocs/parking_space/parking_space_event.dart';
+import 'package:parking_app_flutter/blocs/parking_space/parking_space_state.dart';
 import 'package:parking_app_flutter/models/parking_space.dart';
-import 'package:parking_app_flutter/services/api_service.dart';
 import 'dart:math';
 
 class ParkingSpacesScreen extends StatefulWidget {
@@ -11,11 +15,6 @@ class ParkingSpacesScreen extends StatefulWidget {
 }
 
 class _ParkingSpacesScreenState extends State<ParkingSpacesScreen> {
-  final _apiService = ApiService(baseUrl: 'http://192.168.88.39:8080');
-  List<ParkingSpace> _parkingSpaces = [];
-  bool _isLoading = true;
-  String _errorMessage = '';
-  
   // For filtering and sorting
   final _searchController = TextEditingController();
   String _searchQuery = '';
@@ -52,69 +51,36 @@ class _ParkingSpacesScreenState extends State<ParkingSpacesScreen> {
     _loadParkingSpaces();
   }
   
-  Future<void> _loadParkingSpaces() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
-    
-    try {
-      final spacesData = await _apiService.getList('/api/parkingSpaces');
-      setState(() {
-        _parkingSpaces = spacesData.map<ParkingSpace>((data) => ParkingSpace.fromJson(data)).toList();
-        
-        // If no parking spaces exist, generate default ones
-        if (_parkingSpaces.isEmpty) {
-          _generateDefaultParkingSpaces();
-          return;
-        }
-        
-        _sortParkingSpaces();
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Kunde inte ladda parkeringsplatser: $e';
-        _isLoading = false;
-      });
-    }
+  void _loadParkingSpaces() {
+    // Dispatch the event to load parking spaces
+    context.read<ParkingSpaceBloc>().add(LoadParkingSpaces());
   }
   
   Future<void> _generateDefaultParkingSpaces() async {
-    try {
-      final random = Random();
+    final random = Random();
+    
+    // Create 10 random parking spaces
+    for (int i = 0; i < 10; i++) {
+      // Randomly select an address from the list
+      final address = _malmoAddresses[random.nextInt(_malmoAddresses.length)];
       
-      // Create 10 random parking spaces
-      for (int i = 0; i < 10; i++) {
-        // Randomly select an address from the list
-        final address = _malmoAddresses[random.nextInt(_malmoAddresses.length)];
-        
-        // Generate a random price between 20 and 100 kr/h
-        final price = 20 + random.nextInt(81);
-        
-        await _apiService.createItem('/api/parkingSpaces', {
-          'adress': address,
-          'pricePerHour': price,
-        });
-      }
+      // Generate a random price between 20 and 100 kr/h
+      final price = 20 + random.nextInt(81);
       
-      // Reload parking spaces
-      final spacesData = await _apiService.getList('/api/parkingSpaces');
-      setState(() {
-        _parkingSpaces = spacesData.map<ParkingSpace>((data) => ParkingSpace.fromJson(data)).toList();
-        _sortParkingSpaces();
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Kunde inte skapa parkeringsplatser: $e';
-        _isLoading = false;
-      });
+      // Dispatch the event to add a parking space
+      context.read<ParkingSpaceBloc>().add(
+        AddParkingSpace(adress: address, pricePerHour: price)
+      );
+      
+      // Add a small delay to avoid overwhelming the server
+      await Future.delayed(const Duration(milliseconds: 100));
     }
   }
   
-  void _sortParkingSpaces() {
-    _parkingSpaces.sort((a, b) {
+  List<ParkingSpace> _sortParkingSpaces(List<ParkingSpace> spaces) {
+    final sortedSpaces = List<ParkingSpace>.from(spaces);
+    
+    sortedSpaces.sort((a, b) {
       if (_sortBy == 'price') {
         return _sortAscending 
             ? a.pricePerHour.compareTo(b.pricePerHour)
@@ -125,15 +91,17 @@ class _ParkingSpacesScreenState extends State<ParkingSpacesScreen> {
             : b.adress.compareTo(a.adress);
       }
     });
+    
+    return sortedSpaces;
   }
   
-  List<ParkingSpace> get _filteredParkingSpaces {
+  List<ParkingSpace> _filterParkingSpaces(List<ParkingSpace> spaces) {
     if (_searchQuery.isEmpty) {
-      return _parkingSpaces;
+      return spaces;
     }
     
     final query = _searchQuery.toLowerCase();
-    return _parkingSpaces.where((space) {
+    return spaces.where((space) {
       return space.adress.toLowerCase().contains(query) || 
              space.pricePerHour.toString().contains(query);
     }).toList();
@@ -151,185 +119,222 @@ class _ParkingSpacesScreenState extends State<ParkingSpacesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    
-    if (_errorMessage.isNotEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              _errorMessage,
-              style: const TextStyle(color: Colors.red),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadParkingSpaces,
-              child: const Text('Försök igen'),
-            ),
-          ],
-        ),
-      );
-    }
-    
     return Scaffold(
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Lediga parkeringsplatser',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+      body: BlocConsumer<ParkingSpaceBloc, ParkingSpaceState>(
+        listener: (context, state) {
+          // Show snackbar messages based on the state
+          if (state is ParkingSpaceOperationSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message)),
+            );
+          } else if (state is ParkingSpaceError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.red,
+              ),
+            );
+          } else if (state is ParkingSpaceLoaded && state.parkingSpaces.isEmpty) {
+            // If no parking spaces were loaded, generate default ones
+            _generateDefaultParkingSpaces();
+          }
+        },
+        builder: (context, state) {
+          if (state is ParkingSpaceLoading) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is ParkingSpaceError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    state.message,
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
                   ),
-                ),
-                
-                const SizedBox(height: 16),
-                
-                // Search field
-                TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    labelText: 'Sök parkeringsplats',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadParkingSpaces,
+                    child: const Text('Försök igen'),
+                  ),
+                ],
+              ),
+            );
+          } else if (state is ParkingSpaceLoaded) {
+            // Sort and filter parking spaces
+            final sortedSpaces = _sortParkingSpaces(state.parkingSpaces);
+            final filteredSpaces = _filterParkingSpaces(sortedSpaces);
+            
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Lediga parkeringsplatser',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Search field
+                      TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          labelText: 'Sök parkeringsplats',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() {
+                                      _searchQuery = '';
+                                    });
+                                  },
+                                )
+                              : null,
+                          border: const OutlineInputBorder(),
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value;
+                          });
+                        },
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Sort options
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          const Text('Sortera efter:', style: TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 8),
+                          DropdownButton<String>(
+                            value: _sortBy,
+                            items: const [
+                              DropdownMenuItem(value: 'price', child: Text('Pris')),
+                              DropdownMenuItem(value: 'name', child: Text('Adress')),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() {
+                                  _sortBy = value;
+                                });
+                              }
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: Icon(_sortAscending ? Icons.arrow_upward : Icons.arrow_downward),
+                            tooltip: _sortAscending ? 'Stigande' : 'Fallande',
                             onPressed: () {
-                              _searchController.clear();
                               setState(() {
-                                _searchQuery = '';
+                                _sortAscending = !_sortAscending;
                               });
                             },
-                          )
-                        : null,
-                    border: const OutlineInputBorder(),
+                          ),
+                          const SizedBox(width: 8),
+                          // Add a refresh button
+                          IconButton(
+                            icon: const Icon(Icons.refresh),
+                            tooltip: 'Uppdatera',
+                            onPressed: _loadParkingSpaces,
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value;
-                    });
-                  },
                 ),
                 
-                const SizedBox(height: 16),
-                
-                // Sort options
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    const Text('Sortera efter:', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 8),
-                    DropdownButton<String>(
-                      value: _sortBy,
-                      items: const [
-                        DropdownMenuItem(value: 'price', child: Text('Pris')),
-                        DropdownMenuItem(value: 'name', child: Text('Adress')),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() {
-                            _sortBy = value;
-                            _sortParkingSpaces();
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: Icon(_sortAscending ? Icons.arrow_upward : Icons.arrow_downward),
-                      tooltip: _sortAscending ? 'Stigande' : 'Fallande',
-                      onPressed: () {
-                        setState(() {
-                          _sortAscending = !_sortAscending;
-                          _sortParkingSpaces();
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          
-          Expanded(
-            child: _filteredParkingSpaces.isEmpty
-                ? const Center(child: Text('Inga parkeringsplatser hittades'))
-                : ListView.builder(
-                    itemCount: _filteredParkingSpaces.length,
-                    itemBuilder: (context, index) {
-                      final space = _filteredParkingSpaces[index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: InkWell(
-                          onTap: () => _selectParkingSpace(space),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Row(
-                              children: [
-                                // Price circle
-                                Container(
-                                  width: 60,
-                                  height: 60,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Color(0xFF0078D7),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      '${space.pricePerHour}kr',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                // Address and details
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                Expanded(
+                  child: filteredSpaces.isEmpty
+                      ? const Center(child: Text('Inga parkeringsplatser hittades'))
+                      : ListView.builder(
+                          itemCount: filteredSpaces.length,
+                          itemBuilder: (context, index) {
+                            final space = filteredSpaces[index];
+                            return Card(
+                              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: InkWell(
+                                onTap: () => _selectParkingSpace(space),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Row(
                                     children: [
-                                      Text(
-                                        space.adress,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
+                                      // Price circle
+                                      Container(
+                                        width: 60,
+                                        height: 60,
+                                        decoration: const BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Color(0xFF0078D7),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            '${space.pricePerHour}kr',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${space.pricePerHour} kr per timme',
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
+                                      const SizedBox(width: 16),
+                                      // Address and details
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              space.adress,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              '${space.pricePerHour} kr per timme',
+                                              style: TextStyle(
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
+                                          ],
                                         ),
+                                      ),
+                                      // Arrow icon
+                                      const Icon(
+                                        Icons.arrow_forward_ios,
+                                        color: Color(0xFF0078D7),
                                       ),
                                     ],
                                   ),
                                 ),
-                                // Arrow icon
-                                const Icon(
-                                  Icons.arrow_forward_ios,
-                                  color: Color(0xFF0078D7),
-                                ),
-                              ],
-                            ),
-                          ),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
-          ),
-        ],
+                ),
+              ],
+            );
+          }
+          
+          // Default state
+          return Center(
+            child: ElevatedButton(
+              onPressed: _loadParkingSpaces,
+              child: const Text('Ladda parkeringsplatser'),
+            ),
+          );
+        },
       ),
     );
   }

@@ -1,3 +1,4 @@
+// lib/models/vehicle.dart
 import 'person.dart';
 
 class Vehicle {
@@ -13,47 +14,36 @@ class Vehicle {
     required this.owner,
   });
 
-  // Create a Vehicle from JSON
-  factory Vehicle.fromJson(Map<String, dynamic> json) {
-    return Vehicle(
-      id: json['id'],
-      type: json['type'],
-      registrationNumber: json['registrationNumber'],
-      owner: Person.fromJson(json['owner']),
-    );
+  // Factory constructor to create a Vehicle from JSON
+  factory Vehicle.fromJson(Map<String, dynamic> json, [Person? owner]) {
+    if (owner != null) {
+      return Vehicle(
+        id: json['id'] as int,
+        type: json['type'] as String,
+        registrationNumber: json['registrationNumber'] as int,
+        owner: owner,
+      );
+    } else {
+      // Create owner from nested json
+      final ownerJson = json['owner'] as Map<String, dynamic>;
+      final owner = Person.fromJson(ownerJson);
+      
+      return Vehicle(
+        id: json['id'] as int,
+        type: json['type'] as String,
+        registrationNumber: json['registrationNumber'] as int,
+        owner: owner,
+      );
+    }
   }
 
-  // Convert Vehicle to JSON
+  // Convert a Vehicle to JSON
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'type': type,
       'registrationNumber': registrationNumber,
-      'owner': owner.toJson(),
-    };
-  }
-
-  // Create simplified JSON for update/create operations
-  Map<String, dynamic> toSimpleJson() {
-    return {
-      'type': type,
-      'registrationNumber': registrationNumber,
       'ownerId': owner.id,
     };
-  }
-
-  // Create a copy of the Vehicle with possible updates
-  Vehicle copyWith({
-    int? id,
-    String? type,
-    int? registrationNumber,
-    Person? owner,
-  }) {
-    return Vehicle(
-      id: id ?? this.id,
-      type: type ?? this.type,
-      registrationNumber: registrationNumber ?? this.registrationNumber,
-      owner: owner ?? this.owner,
-    );
   }
 }

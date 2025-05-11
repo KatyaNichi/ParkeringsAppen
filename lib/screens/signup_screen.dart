@@ -15,7 +15,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _nameController = TextEditingController();
   final _personnummerController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _apiService = ApiService(baseUrl: 'http://192.168.88.39:8080');
+  final _apiService = ApiService(baseUrl: 'http://192.168.88.24:8080');
   
   bool _isLoading = false;
   String _errorMessage = '';
