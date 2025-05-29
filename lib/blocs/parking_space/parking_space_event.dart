@@ -1,3 +1,4 @@
+// lib/blocs/parking_space/parking_space_event.dart
 import 'package:equatable/equatable.dart';
 import '../../models/parking_space.dart';
 
@@ -13,7 +14,7 @@ class LoadParkingSpaces extends ParkingSpaceEvent {}
 
 // Event to load a specific parking space by ID
 class LoadParkingSpaceById extends ParkingSpaceEvent {
-  final int id;
+  final String id;  // Changed from int to String
 
   const LoadParkingSpaceById(this.id);
 
@@ -37,7 +38,7 @@ class AddParkingSpace extends ParkingSpaceEvent {
 
 // Event to update a parking space
 class UpdateParkingSpace extends ParkingSpaceEvent {
-  final int id;
+  final String id;  // Changed from int to String
   final String? newAdress;
   final int? newPricePerHour;
 
@@ -53,10 +54,20 @@ class UpdateParkingSpace extends ParkingSpaceEvent {
 
 // Event to delete a parking space
 class DeleteParkingSpace extends ParkingSpaceEvent {
-  final int id;
+  final String id;  // Changed from int to String
 
   const DeleteParkingSpace(this.id);
 
   @override
   List<Object?> get props => [id];
+}
+
+// Event to search parking spaces by address
+class SearchParkingSpaces extends ParkingSpaceEvent {
+  final String query;
+
+  const SearchParkingSpaces(this.query);
+
+  @override
+  List<Object?> get props => [query];
 }

@@ -140,6 +140,16 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: TextStyle(fontSize: 16),
                           ),
                         ),
+                    const SizedBox(height: 16.0),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushReplacementNamed(context, '/signup');
+                      },
+                      child: const Text(
+                        'Har du inget konto? Skapa ett här',
+                        style: TextStyle(color: Color(0xFF0078D7)),
+                      ),
+                    ),
                   ],
                 ),
               ),

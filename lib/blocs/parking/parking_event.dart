@@ -1,3 +1,4 @@
+// lib/blocs/parking/parking_event.dart
 import 'package:equatable/equatable.dart';
 import '../../models/parking.dart';
 
@@ -32,7 +33,7 @@ class StartParking extends ParkingEvent {
 
 // Event to end a parking
 class EndParking extends ParkingEvent {
-  final String parkingId; // ✅ Changed from int to String
+  final String parkingId;  // Changed from int to String
   final String endTime;
 
   const EndParking({

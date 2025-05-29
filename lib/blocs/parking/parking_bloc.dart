@@ -1,11 +1,11 @@
+// lib/blocs/parking/parking_bloc.dart
 import 'package:bloc/bloc.dart';
-import 'package:flutter/foundation.dart';
-import '../../repositories/http_parking_repository.dart';
+import '../../repositories/firestore_parking_repository.dart';
 import 'parking_event.dart';
 import 'parking_state.dart';
 
 class ParkingBloc extends Bloc<ParkingEvent, ParkingState> {
-  final HttpParkingRepository parkingRepository;
+  final FirestoreParkingRepository parkingRepository;
 
   ParkingBloc({required this.parkingRepository}) : super(ParkingInitial()) {
     on<LoadParkings>(_onLoadParkings);

@@ -1,10 +1,11 @@
+// lib/blocs/parking_space/parking_space_bloc.dart
 import 'package:bloc/bloc.dart';
-import '../../repositories/http_parking_space_repository.dart';
+import '../../repositories/firestore_parking_space_repository.dart';
 import 'parking_space_event.dart';
 import 'parking_space_state.dart';
 
 class ParkingSpaceBloc extends Bloc<ParkingSpaceEvent, ParkingSpaceState> {
-  final HttpParkingSpaceRepository parkingSpaceRepository;
+  final FirestoreParkingSpaceRepository parkingSpaceRepository;
 
   ParkingSpaceBloc({required this.parkingSpaceRepository}) : super(ParkingSpaceInitial()) {
     on<LoadParkingSpaces>(_onLoadParkingSpaces);
@@ -12,6 +13,7 @@ class ParkingSpaceBloc extends Bloc<ParkingSpaceEvent, ParkingSpaceState> {
     on<AddParkingSpace>(_onAddParkingSpace);
     on<UpdateParkingSpace>(_onUpdateParkingSpace);
     on<DeleteParkingSpace>(_onDeleteParkingSpace);
+    on<SearchParkingSpaces>(_onSearchParkingSpaces);
   }
 
   void _onLoadParkingSpaces(LoadParkingSpaces event, Emitter<ParkingSpaceState> emit) async {
@@ -103,4 +105,15 @@ class ParkingSpaceBloc extends Bloc<ParkingSpaceEvent, ParkingSpaceState> {
     } catch (e) {
       emit(ParkingSpaceError('Failed to delete parking space: $e'));
     }
-  }}
+  }
+
+  void _onSearchParkingSpaces(SearchParkingSpaces event, Emitter<ParkingSpaceState> emit) async {
+    emit(ParkingSpaceLoading());
+    try {
+      final parkingSpaces = await parkingSpaceRepository.searchParkingSpacesByAddress(event.query);
+      emit(ParkingSpaceLoaded(parkingSpaces));
+    } catch (e) {
+      emit(ParkingSpaceError('Failed to search parking spaces: $e'));
+    }
+  }
+}

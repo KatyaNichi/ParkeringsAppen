@@ -1,10 +1,11 @@
+// lib/blocs/vehicle/vehicle_bloc.dart
 import 'package:bloc/bloc.dart';
-import '../../repositories/http_vehicle_repository.dart';
+import '../../repositories/firestore_vehicle_repository.dart';
 import 'vehicle_event.dart';
 import 'vehicle_state.dart';
 
 class VehicleBloc extends Bloc<VehicleEvent, VehicleState> {
-  final HttpVehicleRepository vehicleRepository;
+  final FirestoreVehicleRepository vehicleRepository;
 
   VehicleBloc({required this.vehicleRepository}) : super(VehicleInitial()) {
     on<LoadVehicles>(_onLoadVehicles);
@@ -24,68 +25,68 @@ class VehicleBloc extends Bloc<VehicleEvent, VehicleState> {
     }
   }
 
-void _onLoadVehiclesByOwner(LoadVehiclesByOwner event, Emitter<VehicleState> emit) async {
-  emit(VehicleLoading());
-  try {
-    print('🚗 Loading vehicles for owner: ${event.ownerId}');
-    final vehicles = await vehicleRepository.getVehiclesByOwnerId(event.ownerId);
-    print('✅ Loaded ${vehicles.length} vehicles');
-    emit(VehicleLoaded(vehicles));
-  } catch (e) {
-    print('❌ Error loading vehicles: $e');
-    emit(VehicleError('Failed to load owner vehicles: $e'));
-  }
-}
-
-void _onAddVehicle(AddVehicle event, Emitter<VehicleState> emit) async {
-  emit(VehicleLoading());
-  try {
-    print('🚗 Adding vehicle: ${event.type}');
-    final vehicle = await vehicleRepository.addVehicle(
-      event.type, 
-      event.registrationNumber, 
-      event.ownerId
-    );
-    
-    // If the state was previously VehicleLoaded, add the new vehicle to the list
-    if (state is VehicleLoaded) {
-      final currentVehicles = (state as VehicleLoaded).vehicles;
-      emit(VehicleLoaded([...currentVehicles, vehicle], pendingChanges: true));
-    } else {
-      // Otherwise, just emit success and reload vehicles afterward
-      emit(VehicleOperationSuccess('Vehicle added successfully', vehicle: vehicle));
+  void _onLoadVehiclesByOwner(LoadVehiclesByOwner event, Emitter<VehicleState> emit) async {
+    emit(VehicleLoading());
+    try {
+      print('🚗 Loading vehicles for owner: ${event.ownerId}');
       final vehicles = await vehicleRepository.getVehiclesByOwnerId(event.ownerId);
+      print('✅ Loaded ${vehicles.length} vehicles');
       emit(VehicleLoaded(vehicles));
+    } catch (e) {
+      print('❌ Error loading vehicles: $e');
+      emit(VehicleError('Failed to load owner vehicles: $e'));
     }
-  } catch (e) {
-    print('❌ Error adding vehicle: $e');
-    emit(VehicleError('Failed to add vehicle: $e'));
   }
-}
 
-void _onDeleteVehicle(DeleteVehicle event, Emitter<VehicleState> emit) async {
-  emit(VehicleLoading());
-  try {
-    print('🚗 Deleting vehicle: ${event.vehicleId}');
-    final success = await vehicleRepository.removeVehicle(event.vehicleId);
-    
-    if (success) {
+  void _onAddVehicle(AddVehicle event, Emitter<VehicleState> emit) async {
+    emit(VehicleLoading());
+    try {
+      print('🚗 Adding vehicle: ${event.type}');
+      final vehicle = await vehicleRepository.addVehicle(
+        event.type, 
+        event.registrationNumber, 
+        event.ownerId
+      );
+      
+      // If the state was previously VehicleLoaded, add the new vehicle to the list
       if (state is VehicleLoaded) {
         final currentVehicles = (state as VehicleLoaded).vehicles;
-        final updatedVehicles = currentVehicles.where((v) => v.id != event.vehicleId).toList();
-        emit(VehicleLoaded(updatedVehicles, pendingChanges: true));
+        emit(VehicleLoaded([...currentVehicles, vehicle], pendingChanges: true));
       } else {
-        emit(VehicleOperationSuccess('Vehicle deleted successfully'));
-        add(LoadVehicles()); // Reload all vehicles
+        // Otherwise, just emit success and reload vehicles afterward
+        emit(VehicleOperationSuccess('Vehicle added successfully', vehicle: vehicle));
+        final vehicles = await vehicleRepository.getVehiclesByOwnerId(event.ownerId);
+        emit(VehicleLoaded(vehicles));
       }
-    } else {
-      emit(VehicleError('Failed to delete vehicle: Vehicle not found'));
+    } catch (e) {
+      print('❌ Error adding vehicle: $e');
+      emit(VehicleError('Failed to add vehicle: $e'));
     }
-  } catch (e) {
-    print('❌ Error deleting vehicle: $e');
-    emit(VehicleError('Failed to delete vehicle: $e'));
   }
-}
+
+  void _onDeleteVehicle(DeleteVehicle event, Emitter<VehicleState> emit) async {
+    emit(VehicleLoading());
+    try {
+      print('🚗 Deleting vehicle: ${event.vehicleId}');
+      final success = await vehicleRepository.removeVehicle(event.vehicleId);
+      
+      if (success) {
+        if (state is VehicleLoaded) {
+          final currentVehicles = (state as VehicleLoaded).vehicles;
+          final updatedVehicles = currentVehicles.where((v) => v.id != event.vehicleId).toList();
+          emit(VehicleLoaded(updatedVehicles, pendingChanges: true));
+        } else {
+          emit(VehicleOperationSuccess('Vehicle deleted successfully'));
+          add(LoadVehicles()); // Reload all vehicles
+        }
+      } else {
+        emit(VehicleError('Failed to delete vehicle: Vehicle not found'));
+      }
+    } catch (e) {
+      print('❌ Error deleting vehicle: $e');
+      emit(VehicleError('Failed to delete vehicle: $e'));
+    }
+  }
 
   void _onUpdateVehicle(UpdateVehicle event, Emitter<VehicleState> emit) async {
     emit(VehicleLoading());

@@ -1,5 +1,6 @@
-// REPLACE ENTIRE FILE: lib/repositories/firebase_auth_repository.dart
+// lib/repositories/firebase_auth_repository.dart
 import 'package:firebase_auth/firebase_auth.dart';
+import '../models/person.dart';
 
 class FirebaseAuthRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -106,7 +107,7 @@ class FirebaseAuthRepository {
   }
   
   // Update user profile
-  Future<void> updateProfile({String? displayName, String? photoURL}) async {
+  Future<void> updateUserProfile({String? displayName, String? photoURL}) async {
     try {
       final user = _auth.currentUser;
       if (user != null) {

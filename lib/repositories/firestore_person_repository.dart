@@ -1,4 +1,4 @@
-// CREATE THIS FILE: lib/repositories/firestore_person_repository.dart
+// lib/repositories/firestore_person_repository.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/person.dart';
 
@@ -6,21 +6,22 @@ class FirestorePersonRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _collection = 'persons';
 
-  // Add a person to Firestore
-  Future<Person> addPerson(String name, int personnummer) async {
+  // Add a person to Firestore with a specific ID (the Firebase Auth UID)
+  Future<Person> addPerson(String uid, String name, int personnummer) async {
     try {
-      print('🔥 Creating person in Firestore: $name');
+      print('🔥 Creating person in Firestore with ID: $uid');
       
-      final docRef = await _firestore.collection(_collection).add({
+      // Use the provided UID as the document ID
+      await _firestore.collection(_collection).doc(uid).set({
         'name': name,
         'personnummer': personnummer,
         'createdAt': FieldValue.serverTimestamp(),
       });
       
-      print('✅ Person created with ID: ${docRef.id}');
+      print('✅ Person created with ID: $uid');
       
       return Person(
-        id: docRef.id, // Firestore uses String IDs
+        id: uid,
         name: name,
         personnummer: personnummer,
       );
@@ -54,7 +55,7 @@ class FirestorePersonRepository {
     }
   }
 
-  // Get a person by ID
+  // Get a person by ID (Firebase Auth UID)
   Future<Person?> getPersonById(String id) async {
     try {
       print('🔥 Getting person by ID: $id');
@@ -101,34 +102,5 @@ class FirestorePersonRepository {
       print('❌ Error updating person: $e');
       return false;
     }
-  }
-
-  // Remove a person
-  Future<bool> removePerson(String id) async {
-    try {
-      print('🔥 Removing person: $id');
-      
-      await _firestore.collection(_collection).doc(id).delete();
-      
-      print('✅ Person removed successfully');
-      return true;
-    } catch (e) {
-      print('❌ Error removing person: $e');
-      return false;
-    }
-  }
-
-  // Get persons stream for real-time updates (bonus for VG)
-  Stream<List<Person>> getPersonsStream() {
-    return _firestore.collection(_collection).snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return Person(
-          id: doc.id,
-          name: data['name'] as String,
-          personnummer: data['personnummer'] as int,
-        );
-      }).toList();
-    });
   }
 }

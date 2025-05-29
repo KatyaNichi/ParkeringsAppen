@@ -1,10 +1,14 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform;
 import 'dart:io' show Platform;
 
 // Firebase imports
 import 'package:firebase_core/firebase_core.dart';
+import 'package:parking_app_flutter/repositories/firestore_parking_repository.dart';
+import 'package:parking_app_flutter/repositories/firestore_parking_space_repository.dart';
+import 'package:parking_app_flutter/repositories/firestore_vehicle_repository.dart';
 import 'firebase_options.dart';
 
 // Repository imports
@@ -33,7 +37,7 @@ import 'package:parking_app_flutter/blocs/parking_space/parking_space_bloc.dart'
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Firebase
   try {
     await Firebase.initializeApp(
@@ -81,7 +85,13 @@ class MyApp extends StatelessWidget {
 
     final String baseUrl = getServerUrl();
     print('🔗 Flutter app connecting to: $baseUrl');
-    print('📱 Platform: ${kIsWeb ? 'Web' : (Platform.isAndroid ? 'Android' : Platform.isIOS ? 'iOS' : 'Other')}');
+    print(
+      '📱 Platform: ${kIsWeb ? 'Web' : (Platform.isAndroid
+              ? 'Android'
+              : Platform.isIOS
+              ? 'iOS'
+              : 'Other')}',
+    );
 
     return MultiRepositoryProvider(
       providers: [
@@ -89,11 +99,38 @@ class MyApp extends StatelessWidget {
         RepositoryProvider<FirebaseAuthRepository>(
           create: (context) => FirebaseAuthRepository(),
         ),
-        
-        // HTTP Repositories for backend communication
+        RepositoryProvider<FirestoreParkingSpaceRepository>(
+          create: (context) => FirestoreParkingSpaceRepository(),
+        ),
+        RepositoryProvider<FirebaseAuthRepository>(
+          create: (context) => FirebaseAuthRepository(),
+        ),
         RepositoryProvider<FirestorePersonRepository>(
-  create: (context) => FirestorePersonRepository(),
-),
+          create: (context) => FirestorePersonRepository(),
+        ),
+        RepositoryProvider<FirestoreParkingSpaceRepository>(
+          create: (context) => FirestoreParkingSpaceRepository(),
+        ),
+        RepositoryProvider<FirestoreParkingRepository>(
+          create: (context) => FirestoreParkingRepository(),
+        ),
+        RepositoryProvider<FirestoreVehicleRepository>(
+          create:
+              (context) => FirestoreVehicleRepository(
+                personRepository: context.read<FirestorePersonRepository>(),
+              ),
+        ),
+        // Firestore Person Repository
+        RepositoryProvider<FirestorePersonRepository>(
+          create: (context) => FirestorePersonRepository(),
+        ),
+        RepositoryProvider<FirestoreVehicleRepository>(
+          create:
+              (context) => FirestoreVehicleRepository(
+                personRepository: context.read<FirestorePersonRepository>(),
+              ),
+        ),
+        // HTTP Repositories (will be migrated to Firestore later)
         RepositoryProvider<HttpVehicleRepository>(
           create: (context) => HttpVehicleRepository(baseUrl: baseUrl),
         ),
@@ -107,32 +144,31 @@ class MyApp extends StatelessWidget {
       child: MultiBlocProvider(
         providers: [
           // Auth BLoC using Firebase
-         BlocProvider<AuthBloc>(
-  create: (context) => AuthBloc(
-    authRepository: context.read<FirebaseAuthRepository>(),
-    personRepository: context.read<FirestorePersonRepository>(),
-  ),
-),
-          
-          // Vehicle BLoC using HTTP repository
+          BlocProvider<AuthBloc>(
+            create:
+                (context) => AuthBloc(
+                  authRepository: context.read<FirebaseAuthRepository>(),
+                  personRepository: context.read<FirestorePersonRepository>(),
+                ),
+          ),
           BlocProvider<VehicleBloc>(
-            create: (context) => VehicleBloc(
-              vehicleRepository: context.read<HttpVehicleRepository>(),
-            ),
+            create:
+                (context) => VehicleBloc(
+                  vehicleRepository: context.read<FirestoreVehicleRepository>(),
+                ),
           ),
-          
-          // Parking BLoC using HTTP repository
           BlocProvider<ParkingBloc>(
-            create: (context) => ParkingBloc(
-              parkingRepository: context.read<HttpParkingRepository>(),
-            ),
+            create:
+                (context) => ParkingBloc(
+                  parkingRepository: context.read<FirestoreParkingRepository>(),
+                ),
           ),
-          
-          // Parking Space BLoC using HTTP repository
           BlocProvider<ParkingSpaceBloc>(
-            create: (context) => ParkingSpaceBloc(
-              parkingSpaceRepository: context.read<HttpParkingSpaceRepository>(),
-            ),
+            create:
+                (context) => ParkingSpaceBloc(
+                  parkingSpaceRepository:
+                      context.read<FirestoreParkingSpaceRepository>(),
+                ),
           ),
         ],
         child: MaterialApp(
@@ -183,34 +219,36 @@ class MyApp extends StatelessWidget {
                   );
                 }
                 break;
-                
+
               case '/manage_parking':
                 if (settings.arguments is ParkingSpace) {
-                  final ParkingSpace parkingSpace = settings.arguments as ParkingSpace;
+                  final ParkingSpace parkingSpace =
+                      settings.arguments as ParkingSpace;
                   return MaterialPageRoute(
-                    builder: (context) => ManageParkingScreen(parkingSpace: parkingSpace),
+                    builder:
+                        (context) =>
+                            ManageParkingScreen(parkingSpace: parkingSpace),
                     settings: settings,
                   );
                 }
                 break;
             }
-            
+
             // Fallback to home if route not found
             return MaterialPageRoute(
               builder: (context) => const WelcomeScreen(),
             );
           },
-          
+
           // Global error handling
           builder: (context, child) {
             return Builder(
               builder: (context) {
                 // Handle global app errors here if needed
-                return child ?? const Scaffold(
-                  body: Center(
-                    child: Text('App Loading Error'),
-                  ),
-                );
+                return child ??
+                    const Scaffold(
+                      body: Center(child: Text('App Loading Error')),
+                    );
               },
             );
           },
@@ -218,38 +256,4 @@ class MyApp extends StatelessWidget {
       ),
     );
   }
-}
-
-// Helper class for app configuration
-class AppConfig {
-  static const String appVersion = '1.0.0';
-  static const String appName = 'ParkeringsAppen';
-  
-  // Server configuration
-  static String getServerUrl() {
-    if (kIsWeb) {
-      return 'http://localhost:8080';
-    }
-    
-    try {
-      if (Platform.isAndroid) {
-        return 'http://10.0.2.2:8080'; // Android emulator
-      } else if (Platform.isIOS) {
-        return 'http://localhost:8080'; // iOS simulator
-      } else {
-        return 'http://192.168.88.24:8080'; // Real device
-      }
-    } catch (e) {
-      return 'http://localhost:8080'; // Fallback
-    }
-  }
-  
-  // Debug configuration
-
-  
-  // Platform helpers
-  static bool get isWeb => kIsWeb;
-  static bool get isAndroid => !kIsWeb && Platform.isAndroid;
-  static bool get isIOS => !kIsWeb && Platform.isIOS;
-  static bool get isMobile => isAndroid || isIOS;
 }
