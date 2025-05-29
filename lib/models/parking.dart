@@ -1,6 +1,5 @@
-// lib/models/parking.dart
 class Parking {
-  final int id;
+  final String id; // Changed from int to String
   final String fordon;
   final String parkingPlace;
   final String? startTime;
@@ -17,7 +16,7 @@ class Parking {
   // Factory constructor to create a Parking from JSON
   factory Parking.fromJson(Map<String, dynamic> json) {
     return Parking(
-      id: json['id'] as int,
+      id: json['id'].toString(), // Convert to String
       fordon: json['fordon'] as String,
       parkingPlace: json['parkingPlace'] as String,
       startTime: json['startTime'] as String?,

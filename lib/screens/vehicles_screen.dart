@@ -44,10 +44,10 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     _loadVehicles(currentUser.id);
   }
   
-  void _loadVehicles(int ownerId) {
-    // Dispatch the event to load vehicles by owner
-    context.read<VehicleBloc>().add(LoadVehiclesByOwner(ownerId));
-  }
+  void _loadVehicles(String ownerId) { // Changed int to String
+  // Dispatch the event to load vehicles by owner
+  context.read<VehicleBloc>().add(LoadVehiclesByOwner(ownerId));
+}
 
   Future<void> _addVehicle() async {
     // Show add vehicle dialog
@@ -121,11 +121,11 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
               }
 
               // Dispatch the event to add a vehicle
-              context.read<VehicleBloc>().add(AddVehicle(
-                type: _typeController.text,
-                registrationNumber: regNum,
-                ownerId: currentUser.id,
-              ));
+           context.read<VehicleBloc>().add(AddVehicle(
+  type: _typeController.text,
+  registrationNumber: regNum,
+  ownerId: currentUser.id, // This is now String, so it works
+));
               
               // Clear form fields
               _typeController.clear();
@@ -138,37 +138,37 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     );
   }
 
-  Future<void> _deleteVehicle(int id) async {
-    // Show confirmation dialog
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Ta bort fordon'),
-        content: const Text(
-          'Är du säker på att du vill ta bort detta fordon?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Avbryt'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text(
-              'Ta bort',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
+  Future<void> _deleteVehicle(String id) async { // Changed int to String
+  // Show confirmation dialog
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Ta bort fordon'),
+      content: const Text(
+        'Är du säker på att du vill ta bort detta fordon?',
       ),
-    );
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Avbryt'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text(
+            'Ta bort',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      ],
+    ),
+  );
 
-    if (confirm != true) return;
+  if (confirm != true) return;
 
-    // Dispatch the event to delete a vehicle
-    context.read<VehicleBloc>().add(DeleteVehicle(id));
-  }
+  // Dispatch the event to delete a vehicle
+  context.read<VehicleBloc>().add(DeleteVehicle(id));
+}
 
 // Inside the build method of your VehiclesScreen
 @override

@@ -1,12 +1,18 @@
+// REPLACE ENTIRE FILE: lib/blocs/auth/auth_bloc.dart
 import 'package:bloc/bloc.dart';
-import '../../repositories/http_person_repository.dart';
+import '../../repositories/firestore_person_repository.dart';
+import '../../repositories/firebase_auth_repository.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
-  final HttpPersonRepository personRepository;
+  final FirebaseAuthRepository authRepository;
+  final FirestorePersonRepository personRepository;
 
-  AuthBloc({required this.personRepository}) : super(AuthInitial()) {
+  AuthBloc({
+    required this.authRepository,
+    required this.personRepository,
+  }) : super(AuthInitial()) {
     on<LoginRequested>(_onLoginRequested);
     on<LogoutRequested>(_onLogoutRequested);
     on<RegisterRequested>(_onRegisterRequested);
@@ -15,38 +21,63 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   void _onLoginRequested(LoginRequested event, Emitter<AuthState> emit) async {
     emit(AuthLoading());
     try {
-      // Fetch all persons from the repository
-      final persons = await personRepository.getAllPersons();
+      print('🔐 Attempting login for: ${event.username}');
       
-      // Find user by name (simple login for demonstration)
-      final user = persons.firstWhere(
-        (p) => p.name == event.username, 
-        orElse: () => throw Exception('User not found')
-      );
+      // Use Firebase Auth for authentication
+      final userCredential = await authRepository.signIn(event.username, event.password);
       
-      emit(AuthAuthenticated(user));
+      if (userCredential.user != null) {
+        // Try to find existing person profile in Firestore
+        final persons = await personRepository.getAllPersons();
+        final person = persons.firstWhere(
+          (p) => p.name == event.username, // You might want to use email instead
+          orElse: () => throw Exception('User profile not found'),
+        );
+        
+        print('✅ Login successful for: ${person.name}');
+        emit(AuthAuthenticated(person));
+      } else {
+        emit(const AuthError('Login failed'));
+      }
     } catch (e) {
+      print('❌ Login failed: $e');
       emit(AuthError(e.toString()));
     }
   }
 
   void _onLogoutRequested(LogoutRequested event, Emitter<AuthState> emit) async {
-    emit(AuthUnauthenticated());
+    try {
+      await authRepository.signOut();
+      emit(AuthUnauthenticated());
+    } catch (e) {
+      emit(AuthError(e.toString()));
+    }
   }
 
   void _onRegisterRequested(RegisterRequested event, Emitter<AuthState> emit) async {
     emit(AuthLoading());
     try {
-      // Create a new person in the repository
-      final newUser = await personRepository.addPerson(
-        event.name, 
-        event.personnummer
-      );
+      print('📝 Attempting registration for: ${event.name}');
       
-      emit(AuthRegistered(newUser));
-      // Automatically authenticate after registration
-      emit(AuthAuthenticated(newUser));
+      // Create Firebase Auth user
+      final userCredential = await authRepository.register(event.name, event.password);
+      
+      if (userCredential.user != null) {
+        // Create person profile in Firestore
+        final newUser = await personRepository.addPerson(
+          event.name, 
+          event.personnummer
+        );
+        
+        print('✅ Registration successful for: ${newUser.name}');
+        emit(AuthRegistered(newUser));
+        // Automatically authenticate after registration
+        emit(AuthAuthenticated(newUser));
+      } else {
+        emit(const AuthError('Registration failed'));
+      }
     } catch (e) {
+      print('❌ Registration failed: $e');
       emit(AuthError(e.toString()));
     }
   }

@@ -18,6 +18,7 @@ import 'package:parking_app_flutter/blocs/vehicle/vehicle_state.dart';
 // Import models
 import 'package:parking_app_flutter/models/parking.dart';
 import 'package:parking_app_flutter/models/parking_space.dart';
+import 'package:parking_app_flutter/models/person.dart';
 import 'package:parking_app_flutter/models/vehicle.dart';
 
 // Import services
@@ -174,26 +175,31 @@ class _ParkingsScreenState extends State<ParkingsScreen>
                   final parking = _activeParkings[index];
 
                   // Find vehicle and parking space details
-                  final vehicle = _userVehicles.firstWhere(
-                    (v) => v.id.toString() == parking.fordon,
-                    orElse:
-                        () => Vehicle(
-                          id: -1,
-                          type: 'Okänt fordon',
-                          registrationNumber: 0,
-                          owner: _userVehicles.isNotEmpty ? _userVehicles.first.owner : null!,
-                        ),
-                  );
+                  // Find vehicle and parking space details
+final vehicle = _userVehicles.firstWhere(
+  (v) => v.id.toString() == parking.fordon,
+  orElse: () => Vehicle(
+    id: '-1', // Changed to String
+    type: 'Okänt fordon',
+    registrationNumber: 0,
+    owner: _userVehicles.isNotEmpty 
+        ? _userVehicles.first.owner 
+        : Person(
+            id: '-1',
+            name: 'Okänd ägare',
+            personnummer: 0,
+          ),
+  ),
+);
 
-                  final parkingSpace = _parkingSpaces.firstWhere(
-                    (s) => s.id.toString() == parking.parkingPlace,
-                    orElse:
-                        () => ParkingSpace(
-                          id: -1,
-                          adress: 'Okänd plats',
-                          pricePerHour: 0,
-                        ),
-                  );
+final parkingSpace = _parkingSpaces.firstWhere(
+  (s) => s.id.toString() == parking.parkingPlace,
+  orElse: () => ParkingSpace(
+    id: '-1', // If ParkingSpace.id is also String  
+    adress: 'Okänd plats',
+    pricePerHour: 0,
+  ),
+);
 
                   return Card(
                     margin: const EdgeInsets.symmetric(
@@ -247,138 +253,136 @@ class _ParkingsScreenState extends State<ParkingsScreen>
     );
   }
 
-  // Tab for displaying parking history
-  Widget _buildParkingHistoryTab() {
-    return RefreshIndicator(
-      onRefresh: () async {
-        context.read<ParkingBloc>().add(LoadParkings());
-      },
-      child:
-          _parkingHistory.isEmpty
-              ? const Center(child: Text('Ingen parkeringshistorik'))
-              : ListView.builder(
-                itemCount: _parkingHistory.length,
-                itemBuilder: (context, index) {
-                  final parking = _parkingHistory[index];
+Widget _buildParkingHistoryTab() {
+  return RefreshIndicator(
+    onRefresh: () async {
+      context.read<ParkingBloc>().add(LoadParkings());
+    },
+    child: _parkingHistory.isEmpty
+        ? const Center(child: Text('Ingen parkeringshistorik'))
+        : ListView.builder(
+            itemCount: _parkingHistory.length,
+            itemBuilder: (context, index) {
+              final parking = _parkingHistory[index];
 
-                  // Find vehicle and parking space details
-                  final vehicle = _userVehicles.firstWhere(
-                    (v) => v.id.toString() == parking.fordon,
-                    orElse:
-                        () => Vehicle(
-                          id: -1,
-                          type: 'Okänt fordon',
-                          registrationNumber: 0,
-                          owner:
-                              _userVehicles.isNotEmpty
-                                  ? _userVehicles.first.owner
-                                  : null!,
+              // Find vehicle and parking space details
+              final vehicle = _userVehicles.firstWhere(
+                (v) => v.id.toString() == parking.fordon,
+                orElse: () => Vehicle(
+                  id: '-1', // ✅ Changed to String
+                  type: 'Okänt fordon',
+                  registrationNumber: 0,
+                  owner: _userVehicles.isNotEmpty
+                      ? _userVehicles.first.owner
+                      : Person( // ✅ Create proper Person object
+                          id: '-1',
+                          name: 'Okänd ägare',
+                          personnummer: 0,
                         ),
-                  );
+                ),
+              );
 
-                  final parkingSpace = _parkingSpaces.firstWhere(
-                    (s) => s.id.toString() == parking.parkingPlace,
-                    orElse:
-                        () => ParkingSpace(
-                          id: -1,
-                          adress: 'Okänd plats',
-                          pricePerHour: 0,
-                        ),
-                  );
+              final parkingSpace = _parkingSpaces.firstWhere(
+                (s) => s.id.toString() == parking.parkingPlace,
+                orElse: () => ParkingSpace(
+                  id: '-1', // ✅ Changed to String
+                  adress: 'Okänd plats',
+                  pricePerHour: 0,
+                ),
+              );
 
-                  // Calculate duration if available
-                  String duration = 'N/A';
-                  double cost = 0;
+              // Calculate duration if available
+              String duration = 'N/A';
+              double cost = 0;
 
-                  if (parking.startTime != null && parking.endTime != null) {
-                    // Parse times (assuming format like "HH:MM")
-                    final startParts = parking.startTime!.split(':');
-                    final endParts = parking.endTime!.split(':');
+              if (parking.startTime != null && parking.endTime != null) {
+                // Parse times (assuming format like "HH:MM")
+                final startParts = parking.startTime!.split(':');
+                final endParts = parking.endTime!.split(':');
 
-                    if (startParts.length == 2 && endParts.length == 2) {
-                      try {
-                        final startHour = int.parse(startParts[0]);
-                        final startMinute = int.parse(startParts[1]);
-                        final endHour = int.parse(endParts[0]);
-                        final endMinute = int.parse(endParts[1]);
+                if (startParts.length == 2 && endParts.length == 2) {
+                  try {
+                    final startHour = int.parse(startParts[0]);
+                    final startMinute = int.parse(startParts[1]);
+                    final endHour = int.parse(endParts[0]);
+                    final endMinute = int.parse(endParts[1]);
 
-                        // Create DateTime objects for today with these times
-                        final now = DateTime.now();
-                        final start = DateTime(
-                          now.year,
-                          now.month,
-                          now.day,
-                          startHour,
-                          startMinute,
-                        );
-                        var end = DateTime(
-                          now.year,
-                          now.month,
-                          now.day,
-                          endHour,
-                          endMinute,
-                        );
+                    // Create DateTime objects for today with these times
+                    final now = DateTime.now();
+                    final start = DateTime(
+                      now.year,
+                      now.month,
+                      now.day,
+                      startHour,
+                      startMinute,
+                    );
+                    var end = DateTime(
+                      now.year,
+                      now.month,
+                      now.day,
+                      endHour,
+                      endMinute,
+                    );
 
-                        // If end time is before start time, assume it's the next day
-                        if (end.isBefore(start)) {
-                          end = end.add(const Duration(days: 1));
-                        }
-
-                        final difference = end.difference(start);
-                        final hours = difference.inHours;
-                        final minutes = difference.inMinutes % 60;
-
-                        duration = '$hours tim $minutes min';
-
-                        // Calculate cost (hours + partial hour if minutes > 0)
-                        final hoursFraction = hours + (minutes > 0 ? 1 : 0);
-                       cost = parkingSpace.pricePerHour.toDouble() * hoursFraction;
-                      } catch (e) {
-                        // Fallback if parsing fails
-                        duration = 'N/A';
-                      }
+                    // If end time is before start time, assume it's the next day
+                    if (end.isBefore(start)) {
+                      end = end.add(const Duration(days: 1));
                     }
-                  }
 
-                  return Card(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    final difference = end.difference(start);
+                    final hours = difference.inHours;
+                    final minutes = difference.inMinutes % 60;
+
+                    duration = '$hours tim $minutes min';
+
+                    // Calculate cost (hours + partial hour if minutes > 0)
+                    final hoursFraction = hours + (minutes > 0 ? 1 : 0);
+                    cost = parkingSpace.pricePerHour.toDouble() * hoursFraction;
+                  } catch (e) {
+                    // Fallback if parsing fails
+                    duration = 'N/A';
+                  }
+                }
+              }
+
+              return Card(
+                margin: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${vehicle.type} (${vehicle.registrationNumber})',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text('Plats: ${parkingSpace.adress}'),
+                      Row(
                         children: [
-                          Text(
-                            '${vehicle.type} (${vehicle.registrationNumber})',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
+                          Expanded(
+                            child: Text('Från: ${parking.startTime}'),
                           ),
-                          const SizedBox(height: 8),
-                          Text('Plats: ${parkingSpace.adress}'),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text('Från: ${parking.startTime}'),
-                              ),
-                              Expanded(child: Text('Till: ${parking.endTime}')),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text('Varaktighet: $duration'),
-                          Text('Kostnad: ${cost.toStringAsFixed(0)} kr'),
+                          Expanded(child: Text('Till: ${parking.endTime}')),
                         ],
                       ),
-                    ),
-                  );
-                },
-              ),
-    );
-  }
-
+                      const SizedBox(height: 4),
+                      Text('Varaktighet: $duration'),
+                      Text('Kostnad: ${cost.toStringAsFixed(0)} kr'),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+  );
+}
   @override
   void dispose() {
     _tabController.dispose();

@@ -13,7 +13,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # Read more about Android versioning at https://developer.android.com/studio/publish/versioning
 # In iOS, build-name is used as CFBundleShortVersionString while build-number is used as CFBundleVersion.
 # Read more about iOS versioning at
-# https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
+# https://flutter.dev/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
 version: 1.0.0+1
@@ -34,20 +34,25 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  http: ^1.2.0
+  http: ^1.3.0
   intl: ^0.19.0
-  bloc: ^8.1.2
-  flutter_bloc: ^8.1.3
-  equatable: ^2.0.5
-  shared_preferences: ^2.2.0
+  bloc: ^8.1.4
+  flutter_bloc: ^8.1.6
+  equatable: ^2.0.7
+  shared_preferences: ^2.5.3
+  
+  # Firebase packages - moved to main dependencies with compatible versions
+  firebase_core: ^3.8.0
+  firebase_auth: ^5.3.3
+  cloud_firestore: ^5.6.8
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  bloc_test: ^9.1.1
+  bloc_test: ^9.1.7
   mocktail: ^0.3.0
-  mockito: ^5.4.2
-  build_runner: ^2.4.6
+  mockito: ^5.4.6
+  build_runner: ^2.4.15
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

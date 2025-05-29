@@ -1,40 +1,99 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'dart:io' show Platform;
+
+// Firebase imports
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
+// Repository imports
+import 'package:parking_app_flutter/repositories/firebase_auth_repository.dart';
+import 'package:parking_app_flutter/repositories/firestore_person_repository.dart';
+import 'package:parking_app_flutter/repositories/http_vehicle_repository.dart';
+import 'package:parking_app_flutter/repositories/http_parking_repository.dart';
+import 'package:parking_app_flutter/repositories/http_parking_space_repository.dart';
+
+// Model imports
 import 'package:parking_app_flutter/models/parking_space.dart';
 import 'package:parking_app_flutter/models/person.dart';
+
+// Screen imports
 import 'package:parking_app_flutter/screens/manage_parking_screen.dart';
 import 'package:parking_app_flutter/screens/welcome_screen.dart';
 import 'package:parking_app_flutter/screens/login_screen.dart';
 import 'package:parking_app_flutter/screens/signup_screen.dart';
 import 'package:parking_app_flutter/screens/main_navigation_screen.dart';
 
-// Import repositories
-import 'package:parking_app_flutter/repositories/http_person_repository.dart';
-import 'package:parking_app_flutter/repositories/http_vehicle_repository.dart';
-import 'package:parking_app_flutter/repositories/http_parking_repository.dart';
-import 'package:parking_app_flutter/repositories/http_parking_space_repository.dart';
-
-// Import blocs
+// BLoC imports
 import 'package:parking_app_flutter/blocs/auth/auth_bloc.dart';
 import 'package:parking_app_flutter/blocs/vehicle/vehicle_bloc.dart';
 import 'package:parking_app_flutter/blocs/parking/parking_bloc.dart';
 import 'package:parking_app_flutter/blocs/parking_space/parking_space_bloc.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Firebase
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print('✅ Firebase initialized successfully');
+  } catch (e) {
+    print('❌ Firebase initialization error: $e');
+    if (e is FirebaseException) {
+      print('   Firebase Error Code: ${e.code}');
+      print('   Firebase Error Message: ${e.message}');
+    }
+    // Continue even if Firebase fails - the app can still work with HTTP backend
+  }
+
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    const String baseUrl = 'http://192.168.88.24:8080'; // server URL
+    // Dynamic server URL configuration based on platform
+    String getServerUrl() {
+      if (kIsWeb) {
+        // For web, use localhost
+        return 'http://localhost:8080';
+      } else {
+        try {
+          if (Platform.isAndroid) {
+            // Android emulator uses 10.0.2.2 to reach host machine
+            return 'http://10.0.2.2:8080';
+          } else if (Platform.isIOS) {
+            // iOS simulator can use localhost
+            return 'http://localhost:8080';
+          } else {
+            // For real devices or other platforms, use your actual IP
+            return 'http://192.168.88.24:8080';
+          }
+        } catch (e) {
+          print('⚠️ Platform detection failed, using localhost: $e');
+          return 'http://localhost:8080';
+        }
+      }
+    }
+
+    final String baseUrl = getServerUrl();
+    print('🔗 Flutter app connecting to: $baseUrl');
+    print('📱 Platform: ${kIsWeb ? 'Web' : (Platform.isAndroid ? 'Android' : Platform.isIOS ? 'iOS' : 'Other')}');
 
     return MultiRepositoryProvider(
       providers: [
-        // Provide all repositories
-        RepositoryProvider<HttpPersonRepository>(
-          create: (context) => HttpPersonRepository(baseUrl: baseUrl),
+        // Firebase Auth Repository
+        RepositoryProvider<FirebaseAuthRepository>(
+          create: (context) => FirebaseAuthRepository(),
         ),
+        
+        // HTTP Repositories for backend communication
+        RepositoryProvider<FirestorePersonRepository>(
+  create: (context) => FirestorePersonRepository(),
+),
         RepositoryProvider<HttpVehicleRepository>(
           create: (context) => HttpVehicleRepository(baseUrl: baseUrl),
         ),
@@ -47,22 +106,29 @@ class MyApp extends StatelessWidget {
       ],
       child: MultiBlocProvider(
         providers: [
-          // Provide all BLoCs
-          BlocProvider<AuthBloc>(
-            create: (context) => AuthBloc(
-              personRepository: context.read<HttpPersonRepository>(),
-            ),
-          ),
+          // Auth BLoC using Firebase
+         BlocProvider<AuthBloc>(
+  create: (context) => AuthBloc(
+    authRepository: context.read<FirebaseAuthRepository>(),
+    personRepository: context.read<FirestorePersonRepository>(),
+  ),
+),
+          
+          // Vehicle BLoC using HTTP repository
           BlocProvider<VehicleBloc>(
             create: (context) => VehicleBloc(
               vehicleRepository: context.read<HttpVehicleRepository>(),
             ),
           ),
+          
+          // Parking BLoC using HTTP repository
           BlocProvider<ParkingBloc>(
             create: (context) => ParkingBloc(
               parkingRepository: context.read<HttpParkingRepository>(),
             ),
           ),
+          
+          // Parking Space BLoC using HTTP repository
           BlocProvider<ParkingSpaceBloc>(
             create: (context) => ParkingSpaceBloc(
               parkingSpaceRepository: context.read<HttpParkingSpaceRepository>(),
@@ -71,10 +137,34 @@ class MyApp extends StatelessWidget {
         ],
         child: MaterialApp(
           title: 'ParkeringsAppen',
+          debugShowCheckedModeBanner: false,
           theme: ThemeData(
             primarySwatch: Colors.blue,
-            primaryColor: Color(0xFF0078D7), // Azure blue
+            primaryColor: const Color(0xFF0078D7), // Azure blue
             visualDensity: VisualDensity.adaptivePlatformDensity,
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFF0078D7),
+              foregroundColor: Colors.white,
+              elevation: 2,
+            ),
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0078D7),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            inputDecorationTheme: InputDecorationTheme(
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+            ),
           ),
           initialRoute: '/',
           routes: {
@@ -83,21 +173,83 @@ class MyApp extends StatelessWidget {
             '/signup': (context) => const SignupScreen(),
           },
           onGenerateRoute: (settings) {
-            if (settings.name == '/main') {
-              final Person user = settings.arguments as Person;
-              return MaterialPageRoute(
-                builder: (context) => MainNavigationScreen(user: user),
-              );
-            } else if (settings.name == '/manage_parking') {
-              final ParkingSpace parkingSpace = settings.arguments as ParkingSpace;
-              return MaterialPageRoute(
-                builder: (context) => ManageParkingScreen(parkingSpace: parkingSpace),
-              );
+            switch (settings.name) {
+              case '/main':
+                if (settings.arguments is Person) {
+                  final Person user = settings.arguments as Person;
+                  return MaterialPageRoute(
+                    builder: (context) => MainNavigationScreen(user: user),
+                    settings: settings,
+                  );
+                }
+                break;
+                
+              case '/manage_parking':
+                if (settings.arguments is ParkingSpace) {
+                  final ParkingSpace parkingSpace = settings.arguments as ParkingSpace;
+                  return MaterialPageRoute(
+                    builder: (context) => ManageParkingScreen(parkingSpace: parkingSpace),
+                    settings: settings,
+                  );
+                }
+                break;
             }
-            return null;
+            
+            // Fallback to home if route not found
+            return MaterialPageRoute(
+              builder: (context) => const WelcomeScreen(),
+            );
+          },
+          
+          // Global error handling
+          builder: (context, child) {
+            return Builder(
+              builder: (context) {
+                // Handle global app errors here if needed
+                return child ?? const Scaffold(
+                  body: Center(
+                    child: Text('App Loading Error'),
+                  ),
+                );
+              },
+            );
           },
         ),
       ),
     );
   }
+}
+
+// Helper class for app configuration
+class AppConfig {
+  static const String appVersion = '1.0.0';
+  static const String appName = 'ParkeringsAppen';
+  
+  // Server configuration
+  static String getServerUrl() {
+    if (kIsWeb) {
+      return 'http://localhost:8080';
+    }
+    
+    try {
+      if (Platform.isAndroid) {
+        return 'http://10.0.2.2:8080'; // Android emulator
+      } else if (Platform.isIOS) {
+        return 'http://localhost:8080'; // iOS simulator
+      } else {
+        return 'http://192.168.88.24:8080'; // Real device
+      }
+    } catch (e) {
+      return 'http://localhost:8080'; // Fallback
+    }
+  }
+  
+  // Debug configuration
+
+  
+  // Platform helpers
+  static bool get isWeb => kIsWeb;
+  static bool get isAndroid => !kIsWeb && Platform.isAndroid;
+  static bool get isIOS => !kIsWeb && Platform.isIOS;
+  static bool get isMobile => isAndroid || isIOS;
 }

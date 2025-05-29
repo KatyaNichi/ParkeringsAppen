@@ -13,7 +13,7 @@ class LoadVehicles extends VehicleEvent {}
 
 // Event to load vehicles by owner ID
 class LoadVehiclesByOwner extends VehicleEvent {
-  final int ownerId;
+  final String ownerId; // Changed from int to String
 
   const LoadVehiclesByOwner(this.ownerId);
 
@@ -25,7 +25,7 @@ class LoadVehiclesByOwner extends VehicleEvent {
 class AddVehicle extends VehicleEvent {
   final String type;
   final int registrationNumber;
-  final int ownerId;
+  final String ownerId; // Changed from int to String
 
   const AddVehicle({
     required this.type,
@@ -39,7 +39,7 @@ class AddVehicle extends VehicleEvent {
 
 // Event to delete a vehicle
 class DeleteVehicle extends VehicleEvent {
-  final int vehicleId;
+  final String vehicleId; // Changed int to String
 
   const DeleteVehicle(this.vehicleId);
 
@@ -49,7 +49,7 @@ class DeleteVehicle extends VehicleEvent {
 
 // Event to update a vehicle
 class UpdateVehicle extends VehicleEvent {
-  final int vehicleId;
+  final String vehicleId; // Changed int to String
   final String? newType;
   final int? newRegistrationNumber;
 

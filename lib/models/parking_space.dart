@@ -1,6 +1,6 @@
 // lib/models/parking_space.dart
 class ParkingSpace {
-  final int id;
+  final String id; // Changed from int to String for consistency
   final String adress;
   final int pricePerHour;
 
@@ -13,7 +13,7 @@ class ParkingSpace {
   // Factory constructor to create a ParkingSpace from JSON
   factory ParkingSpace.fromJson(Map<String, dynamic> json) {
     return ParkingSpace(
-      id: json['id'] as int,
+      id: json['id'].toString(), // Convert to String
       adress: json['adress'] as String,
       pricePerHour: json['pricePerHour'] as int,
     );
@@ -27,4 +27,22 @@ class ParkingSpace {
       'pricePerHour': pricePerHour,
     };
   }
+
+  // For Firestore document data (without ID)
+  Map<String, dynamic> toFirestore() {
+    return {
+      'adress': adress,
+      'pricePerHour': pricePerHour,
+    };
+  }
+
+  // Create from Firestore document
+  factory ParkingSpace.fromFirestore(String docId, Map<String, dynamic> data) {
+    return ParkingSpace(
+      id: docId,
+      adress: data['adress'] as String,
+      pricePerHour: data['pricePerHour'] as int,
+    );
+  }
 }
+ 

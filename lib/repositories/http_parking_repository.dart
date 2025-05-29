@@ -81,7 +81,7 @@ class HttpParkingRepository {
   }
   
   // Get a parking by ID
-  Future<Parking?> getParkingById(int id) async {
+  Future<Parking?> getParkingById(String id) async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/api/parkings/$id'));
       
@@ -99,7 +99,7 @@ class HttpParkingRepository {
   }
   
   // Update a parking
-  Future<bool> updateParking(int id, {String? newFordon, String? newParkingPlace, String? newStartTime, String? newEndTime}) async {
+  Future<bool> updateParking(String id, {String? newFordon, String? newParkingPlace, String? newStartTime, String? newEndTime}) async {
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/api/parkings/$id'),
@@ -119,24 +119,24 @@ class HttpParkingRepository {
   }
   
   // End a parking (set end time)
-  Future<bool> endParking(int id, String endTime) async {
-    try {
-      final response = await http.put(
-        Uri.parse('$baseUrl/api/parkings/$id/end'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'endTime': endTime,
-        }),
-      );
-      
-      return response.statusCode == 200;
-    } catch (e) {
-      throw Exception('Error ending parking: $e');
-    }
+Future<bool> endParking(String id, String endTime) async { 
+  try {
+    final response = await http.put(
+      Uri.parse('$baseUrl/api/parkings/$id/end'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'endTime': endTime,
+      }),
+    );
+    
+    return response.statusCode == 200;
+  } catch (e) {
+    throw Exception('Error ending parking: $e');
   }
+}
   
   // Remove a parking
-  Future<bool> removeParking(int id) async {
+  Future<bool> removeParking(String id) async {
     try {
       final response = await http.delete(Uri.parse('$baseUrl/api/parkings/$id'));
       return response.statusCode == 200;

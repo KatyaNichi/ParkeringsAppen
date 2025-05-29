@@ -1,19 +1,28 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bloc_test/bloc_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:parking_app_flutter/blocs/auth/auth_bloc.dart';
 import 'package:parking_app_flutter/blocs/auth/auth_event.dart';
 import 'package:parking_app_flutter/blocs/auth/auth_state.dart';
 import 'package:parking_app_flutter/models/person.dart';
-import '../mocks/mock_person_repository.dart';
+import 'package:parking_app_flutter/repositories/firebase_auth_repository.dart';
+
+// Mock FirebaseAuthRepository
+class MockFirebaseAuthRepository extends Mock implements FirebaseAuthRepository {}
 
 void main() {
   group('AuthBloc', () {
-    late MockPersonRepository mockPersonRepository;
+    late MockFirebaseAuthRepository mockAuthRepository;
     late AuthBloc authBloc;
 
+    // Register fallback value for Person to avoid type mismatch errors
+    setUpAll(() {
+      registerFallbackValue(Person(id: 0, name: 'Fallback', personnummer: 0));
+    });
+
     setUp(() {
-      mockPersonRepository = MockPersonRepository();
-      authBloc = AuthBloc(personRepository: mockPersonRepository);
+      mockAuthRepository = MockFirebaseAuthRepository();
+      authBloc = AuthBloc(authRepository: mockAuthRepository);
     });
 
     tearDown(() {
@@ -26,9 +35,20 @@ void main() {
 
     blocTest<AuthBloc, AuthState>(
       'emits [AuthLoading, AuthAuthenticated] when LoginRequested is added with valid credentials',
+      setUp: () {
+        // Mock successful login
+        when(() => mockAuthRepository.signInWithEmailAndPassword(
+              any(),
+              any(),
+            )).thenAnswer((_) async => Person(
+              id: 1,
+              name: 'TestUser',
+              personnummer: 12345,
+            ));
+      },
       build: () => authBloc,
       act: (bloc) => bloc.add(const LoginRequested(
-        username: 'TestUser',
+        username: 'test@example.com',
         password: 'password123',
       )),
       expect: () => [
@@ -39,9 +59,16 @@ void main() {
 
     blocTest<AuthBloc, AuthState>(
       'emits [AuthLoading, AuthError] when LoginRequested is added with invalid credentials',
+      setUp: () {
+        // Mock failed login
+        when(() => mockAuthRepository.signInWithEmailAndPassword(
+              any(),
+              any(),
+            )).thenThrow(Exception('Invalid credentials'));
+      },
       build: () => authBloc,
       act: (bloc) => bloc.add(const LoginRequested(
-        username: 'NonExistentUser',
+        username: 'invalid@example.com',
         password: 'wrongPassword',
       )),
       expect: () => [
@@ -52,6 +79,19 @@ void main() {
 
     blocTest<AuthBloc, AuthState>(
       'emits [AuthLoading, AuthRegistered, AuthAuthenticated] when RegisterRequested is added',
+      setUp: () {
+        // Mock successful registration
+        when(() => mockAuthRepository.registerWithEmailAndPassword(
+              any(),
+              any(),
+              any(),
+              any(),
+            )).thenAnswer((_) async => Person(
+              id: 2,
+              name: 'NewUser',
+              personnummer: 54321,
+            ));
+      },
       build: () => authBloc,
       act: (bloc) => bloc.add(const RegisterRequested(
         name: 'NewUser',
@@ -67,6 +107,10 @@ void main() {
 
     blocTest<AuthBloc, AuthState>(
       'emits [AuthUnauthenticated] when LogoutRequested is added',
+      setUp: () {
+        // Mock logout
+        when(() => mockAuthRepository.signOut()).thenAnswer((_) async {});
+      },
       build: () => authBloc,
       seed: () => AuthAuthenticated(Person(id: 1, name: 'TestUser', personnummer: 12345)),
       act: (bloc) => bloc.add(LogoutRequested()),
