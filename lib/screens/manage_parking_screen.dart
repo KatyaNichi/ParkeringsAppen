@@ -62,105 +62,107 @@ class _ManageParkingScreenState extends State<ManageParkingScreen> {
     context.read<VehicleBloc>().add(LoadVehiclesByOwner(currentUser.id));
   }
   
-Future<void> _startParking() async {
-  if (_selectedVehicle == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Välj ett fordon först')),
-    );
-    return;
-  }
-  
-  setState(() => _isLoading = true);
-  
-  try {
-    // Check if the vehicle is already parked
-    context.read<ParkingBloc>().add(LoadActiveParkings());
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    final parkingState = context.read<ParkingBloc>().state;
-    if (parkingState is ActiveParkingsLoaded) {
-      final isAlreadyParked = parkingState.activeParkings.any((p) => 
-        p.fordon == _selectedVehicle!.id.toString()
+
+  Future<void> _startParking() async {
+    if (_selectedVehicle == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Välj ett fordon först')),
       );
-      
-      if (isAlreadyParked) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${_selectedVehicle!.type} (${_selectedVehicle!.registrationNumber}) är redan parkerad. Avsluta den parkeringen först.'
-            ),
-          ),
-        );
-        return;
-      }
+      return;
     }
     
-    // Format current time as HH:MM
-    final now = DateTime.now();
-    final startTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    setState(() => _isLoading = true);
     
-    // Schedule notification if enabled
-    String? notificationId;
-    if (_enableNotifications) {
-      try {
-        // Request permissions and schedule notification
-        final hasPermission = await _notificationService.requestPermissions();
-        if (hasPermission) {
-          notificationId = await _notificationService.scheduleActiveParkingReminder(
-            vehicle: _selectedVehicle!,
-            parkingSpace: widget.parkingSpace,
-            estimatedDurationHours: _selectedDurationHours,
-            reminderMinutesBefore: 15, // Remind 15 minutes before expiry
+    try {
+      // Check if the vehicle is already parked
+      context.read<ParkingBloc>().add(LoadActiveParkings());
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      final parkingState = context.read<ParkingBloc>().state;
+      if (parkingState is ActiveParkingsLoaded) {
+        final isAlreadyParked = parkingState.activeParkings.any((p) => 
+          p.fordon == _selectedVehicle!.id.toString()
+        );
+        
+        if (isAlreadyParked) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${_selectedVehicle!.type} (${_selectedVehicle!.registrationNumber}) är redan parkerad. Avsluta den parkeringen först.'
+              ),
+            ),
           );
-          
-          if (notificationId != null) {
-            print('✅ Scheduled notification with ID: $notificationId');
+          return;
+        }
+      }
+      
+      // Format current time as HH:MM
+      final now = DateTime.now();
+      final startTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      
+      // Schedule notification if enabled
+      String? notificationId;
+      if (_enableNotifications) {
+        try {
+          // Request permissions and schedule notification
+          final hasPermission = await _notificationService.requestPermissions();
+          if (hasPermission) {
+            notificationId = await _notificationService.scheduleActiveParkingReminder(
+              vehicle: _selectedVehicle!,
+              parkingSpace: widget.parkingSpace,
+              estimatedDurationHours: _selectedDurationHours,
+              reminderMinutesBefore: 15, // Remind 15 minutes before expiry
+            );
+            
+            if (notificationId != null) {
+              print('📱 Notification scheduled with ID: $notificationId');
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('📱 Påminnelse schemalagd 15 minuter före utgång')),
+              );
+            }
+          } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('📱 Påminnelse schemalagd 15 minuter före utgång')),
+              const SnackBar(content: Text('⚠️ Notifikationer kräver behörighet för påminnelser')),
             );
           }
-        } else {
+        } catch (e) {
+          print('❌ Failed to schedule notification: $e');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('⚠️ Notifikationer kräver behörighet för påminnelser')),
+            SnackBar(content: Text('⚠️ Kunde inte schemalägga påminnelse: $e')),
           );
         }
-      } catch (e) {
-        print('❌ Failed to schedule notification: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('⚠️ Kunde inte schemalägga påminnelse: $e')),
-        );
       }
+      
+      // Start parking using ParkingBloc with notification ID and duration
+      context.read<ParkingBloc>().add(StartParking(
+        vehicleId: _selectedVehicle!.id.toString(),
+        parkingPlaceId: widget.parkingSpace.id.toString(),
+        startTime: startTime,
+        notificationId: notificationId, // Include notification ID
+        estimatedDurationHours: _selectedDurationHours, // Include duration
+      ));
+      
+      // Show success message
+      final durationText = _selectedDurationHours == 1 ? '1 timme' : '$_selectedDurationHours timmar';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Parkering startad för ${_selectedVehicle!.type} ($durationText)')),
+      );
+      
+      // Navigate back to main screen
+      Navigator.pop(context, true);
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Kunde inte starta parkering: $e';
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Kunde inte starta parkering: $e')),
+      );
     }
-    
-    // Start parking using ParkingBloc WITH notification data
-    context.read<ParkingBloc>().add(StartParking(
-      vehicleId: _selectedVehicle!.id.toString(),
-      parkingPlaceId: widget.parkingSpace.id.toString(),
-      startTime: startTime,
-      notificationId: notificationId, // IMPORTANT: Pass the notification ID
-      estimatedDurationHours: _selectedDurationHours, // IMPORTANT: Pass duration
-    ));
-    
-    // Show success message
-    final durationText = _selectedDurationHours == 1 ? '1 timme' : '$_selectedDurationHours timmar';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Parkering startad för ${_selectedVehicle!.type} ($durationText)')),
-    );
-    
-    // Navigate back to main screen
-    Navigator.pop(context, true);
-  } catch (e) {
-    setState(() {
-      _isLoading = false;
-      _errorMessage = 'Kunde inte starta parkering: $e';
-    });
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Kunde inte starta parkering: $e')),
-    );
   }
-}
+
   void _showNotificationTest() async {
     try {
       await _notificationService.showTestNotification();
