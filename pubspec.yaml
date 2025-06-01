@@ -40,6 +40,11 @@ dependencies:
   flutter_bloc: ^8.1.6
   equatable: ^2.0.7
   shared_preferences: ^2.5.3
+
+  flutter_local_notifications: ^17.2.3
+  timezone: ^0.9.4
+  flutter_timezone: ^3.0.1
+  uuid: ^4.5.1
   
   # Firebase packages - moved to main dependencies with compatible versions
   firebase_core: ^3.8.0
