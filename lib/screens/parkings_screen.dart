@@ -70,40 +70,38 @@ class _ParkingsScreenState extends State<ParkingsScreen>
     _loadData();
   }
 
-  // Load all necessary data using BLoCs
-  Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
+Future<void> _loadData() async {
+  setState(() {
+    _isLoading = true;
+    _errorMessage = '';
+  });
 
-    try {
-      // Get the current user
-      final currentUser = UserService().currentUser;
-      if (currentUser != null) {
-        // Load user vehicles
-        context.read<VehicleBloc>().add(LoadVehiclesByOwner(currentUser.id));
-      }
-
-      // Load parking spaces
-      context.read<ParkingSpaceBloc>().add(LoadParkingSpaces());
-
-      // Load active parkings
-      context.read<ParkingBloc>().add(LoadActiveParkings());
-
-      // Load all parkings (for history)
-      context.read<ParkingBloc>().add(LoadParkings());
-
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Ett fel uppstod: $e';
-        _isLoading = false;
-      });
+  try {
+    final currentUser = UserService().currentUser;
+    if (currentUser != null) {
+      // Load user vehicles
+      context.read<VehicleBloc>().add(LoadVehiclesByOwner(currentUser.id));
+      
+      // Load user's parking history (instead of all parkings)
+      context.read<ParkingBloc>().add(LoadParkingsByUser(currentUser.id));
     }
+
+    // Load parking spaces
+    context.read<ParkingSpaceBloc>().add(LoadParkingSpaces());
+
+    // Load active parkings (these should also be filtered by user)
+    context.read<ParkingBloc>().add(LoadActiveParkings());
+
+    setState(() {
+      _isLoading = false;
+    });
+  } catch (e) {
+    setState(() {
+      _errorMessage = 'Ett fel uppstod: $e';
+      _isLoading = false;
+    });
   }
+}
 
   // End a parking and cancel its notification
   Future<void> _endParking(Parking parking) async {
@@ -127,6 +125,23 @@ class _ParkingsScreenState extends State<ParkingsScreen>
     );
     
     if (confirm != true) return;
+  
+  // 🔍 DEBUG: Check what we're trying to cancel
+  print('🔍 DEBUG: Trying to cancel notification...');
+  print('  - parking.id: ${parking.id}');
+  print('  - parking.notificationId: ${parking.notificationId}');
+  
+  // 🔔 NOTIFICATION: Cancel notification if it exists
+  if (parking.notificationId != null) {
+    try {
+      await _notificationService.cancelParkingReminder(parking.notificationId!);
+      print('✅ Successfully cancelled notification: ${parking.notificationId}');
+    } catch (e) {
+      print('❌ Failed to cancel notification: $e');
+    }
+  } else {
+    print('⚠️ No notificationId found in parking record');
+  }
     
     // 🔔 NOTIFICATION: Cancel notification if it exists
     if (parking.notificationId != null) {

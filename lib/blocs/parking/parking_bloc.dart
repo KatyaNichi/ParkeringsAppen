@@ -12,6 +12,7 @@ class ParkingBloc extends Bloc<ParkingEvent, ParkingState> {
     on<LoadActiveParkings>(_onLoadActiveParkings);
     on<StartParking>(_onStartParking);
     on<EndParking>(_onEndParking);
+    on<LoadParkingsByUser>(_onLoadParkingsByUser);
   }
 
   void _onLoadParkings(LoadParkings event, Emitter<ParkingState> emit) async {
@@ -34,25 +35,42 @@ class ParkingBloc extends Bloc<ParkingEvent, ParkingState> {
     }
   }
 
-  void _onStartParking(StartParking event, Emitter<ParkingState> emit) async {
-    emit(ParkingLoading());
-    try {
-      await parkingRepository.addParking(
-        event.vehicleId, 
-        event.parkingPlaceId, 
-        event.startTime, 
-        null
-      );
-      
-      // Load all active parkings after starting a new one
-      final activeParkings = await parkingRepository.getActiveParkings();
-      emit(const ParkingOperationSuccess('Parking started successfully'));
-      emit(ActiveParkingsLoaded(activeParkings));
-    } catch (e) {
-      emit(ParkingError('Failed to start parking: $e'));
-    }
-  }
+  // In lib/blocs/parking/parking_bloc.dart
+// Replace the existing _onStartParking method with this:
 
+void _onStartParking(StartParking event, Emitter<ParkingState> emit) async {
+  emit(ParkingLoading());
+  try {
+    print('🚗 Starting parking with notification ID: ${event.notificationId}');
+    
+    await parkingRepository.addParking(
+      event.vehicleId, 
+      event.parkingPlaceId, 
+      event.startTime, 
+      null, // endTime is null for new parking
+      notificationId: event.notificationId,
+      estimatedDurationHours: event.estimatedDurationHours,
+    );
+    
+    // Load all active parkings after starting a new one
+    final activeParkings = await parkingRepository.getActiveParkings();
+    emit(const ParkingOperationSuccess('Parking started successfully'));
+    emit(ActiveParkingsLoaded(activeParkings));
+  } catch (e) {
+    print('❌ Error starting parking: $e');
+    emit(ParkingError('Failed to start parking: $e'));
+  }
+}
+
+void _onLoadParkingsByUser(LoadParkingsByUser event, Emitter<ParkingState> emit) async {
+  emit(ParkingLoading());
+  try {
+    final parkings = await parkingRepository.getParkingsByUser(event.userId);
+    emit(ParkingLoaded(parkings));
+  } catch (e) {
+    emit(ParkingError('Failed to load user parkings: $e'));
+  }
+}
   void _onEndParking(EndParking event, Emitter<ParkingState> emit) async {
     emit(ParkingLoading());
     try {

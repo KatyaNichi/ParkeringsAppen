@@ -112,11 +112,11 @@ class NotificationRepository {
 
   // Schedule a parking reminder notification
   Future<String?> scheduleParkingReminder({
-    required String vehicleInfo,
-    required String parkingLocation,
-    required DateTime reminderTime,
-    int? customNotificationId,
-  }) async {
+  required String vehicleInfo,
+  required String parkingLocation,
+  required DateTime reminderTime,
+  int? customNotificationId,
+}) async {
     if (!_isInitialized) await initialize();
 
     // Request permissions first
@@ -127,7 +127,8 @@ class NotificationRepository {
     }
 
     // Generate unique ID for this notification
-    final notificationId = customNotificationId ?? reminderTime.millisecondsSinceEpoch;
+     final notificationId = customNotificationId ?? 
+    (reminderTime.millisecondsSinceEpoch % 2147483647);
     final channelId = _uuid.v4();
 
     const String channelName = "Parking Reminders";
@@ -207,29 +208,32 @@ class NotificationRepository {
   }
 
   // Show immediate notification (for testing)
-  Future<void> showImmediateNotification({
-    required String title,
-    required String body,
-    String? payload,
-  }) async {
-    if (!_isInitialized) await initialize();
+Future<void> showImmediateNotification({
+  required String title,
+  required String body,
+  String? payload,
+}) async {
+  if (!_isInitialized) await initialize();
 
-    const androidDetails = AndroidNotificationDetails(
-      'immediate_channel',
-      'Immediate Notifications',
-      channelDescription: 'For immediate test notifications',
-      importance: Importance.high,
-      priority: Priority.high,
-    );
+  const androidDetails = AndroidNotificationDetails(
+    'immediate_channel',
+    'Immediate Notifications',
+    channelDescription: 'For immediate test notifications',
+    importance: Importance.high,
+    priority: Priority.high,
+  );
 
-    const notificationDetails = NotificationDetails(android: androidDetails);
+  const notificationDetails = NotificationDetails(android: androidDetails);
 
-    await _plugin!.show(
-      DateTime.now().millisecondsSinceEpoch,
-      title,
-      body,
-      notificationDetails,
-      payload: payload,
-    );
-  }
+  // FIX: Use a smaller ID instead of timestamp
+  final notificationId = DateTime.now().millisecondsSinceEpoch % 2147483647; // Keep within 32-bit range
+
+  await _plugin!.show(
+    notificationId, // Use the smaller ID
+    title,
+    body,
+    notificationDetails,
+    payload: payload,
+  );
+}
 }
