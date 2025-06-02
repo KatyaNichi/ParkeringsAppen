@@ -15,6 +15,17 @@ class LoadParkings extends ParkingEvent {}
 // Event to load active parkings (those without end time)
 class LoadActiveParkings extends ParkingEvent {}
 
+class LoadActiveParkingsStream extends ParkingEvent {
+  const LoadActiveParkingsStream();
+  
+  @override
+  List<Object?> get props => [];
+  
+  @override
+  String toString() => 'LoadActiveParkingsStream()';
+}
+
+// Event to start a new parking
 class StartParking extends ParkingEvent {
   final String vehicleId;
   final String parkingPlaceId;
@@ -33,9 +44,10 @@ class StartParking extends ParkingEvent {
   @override
   List<Object?> get props => [vehicleId, parkingPlaceId, startTime, notificationId, estimatedDurationHours];
 }
+
 // Event to end a parking
 class EndParking extends ParkingEvent {
-  final String parkingId;  // Changed from int to String
+  final String parkingId;
   final String endTime;
 
   const EndParking({
@@ -46,6 +58,8 @@ class EndParking extends ParkingEvent {
   @override
   List<Object?> get props => [parkingId, endTime];
 }
+
+// Event to load parkings by user
 class LoadParkingsByUser extends ParkingEvent {
   final String userId;
 

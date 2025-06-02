@@ -1,5 +1,6 @@
 // lib/blocs/parking/parking_bloc.dart
 import 'package:bloc/bloc.dart';
+import 'package:parking_app_flutter/models/parking.dart';
 import '../../repositories/firestore_parking_repository.dart';
 import 'parking_event.dart';
 import 'parking_state.dart';
@@ -10,6 +11,7 @@ class ParkingBloc extends Bloc<ParkingEvent, ParkingState> {
   ParkingBloc({required this.parkingRepository}) : super(ParkingInitial()) {
     on<LoadParkings>(_onLoadParkings);
     on<LoadActiveParkings>(_onLoadActiveParkings);
+    on<LoadActiveParkingsStream>(_onLoadActiveParkingsStream); // ADD THIS LINE
     on<StartParking>(_onStartParking);
     on<EndParking>(_onEndParking);
     on<LoadParkingsByUser>(_onLoadParkingsByUser);
@@ -25,6 +27,7 @@ class ParkingBloc extends Bloc<ParkingEvent, ParkingState> {
     }
   }
 
+  // ADD THIS METHOD - it was missing!
   void _onLoadActiveParkings(LoadActiveParkings event, Emitter<ParkingState> emit) async {
     emit(ParkingLoading());
     try {
@@ -35,8 +38,14 @@ class ParkingBloc extends Bloc<ParkingEvent, ParkingState> {
     }
   }
 
-  // In lib/blocs/parking/parking_bloc.dart
-// Replace the existing _onStartParking method with this:
+  // NEW STREAM METHOD for real-time updates
+  void _onLoadActiveParkingsStream(LoadActiveParkingsStream event, Emitter<ParkingState> emit) async {
+    await emit.forEach<List<Parking>>(
+      parkingRepository.getActiveParkingsStream(),
+      onData: (parkings) => ActiveParkingsLoaded(parkings),
+      onError: (error, stackTrace) => ParkingError('Real-time loading failed: $error'),
+    );
+  }
 
   void _onStartParking(StartParking event, Emitter<ParkingState> emit) async {
     emit(ParkingLoading());
@@ -50,24 +59,23 @@ class ParkingBloc extends Bloc<ParkingEvent, ParkingState> {
         estimatedDurationHours: event.estimatedDurationHours,
       );
       
-      // Load all active parkings after starting a new one
-      final activeParkings = await parkingRepository.getActiveParkings();
       emit(const ParkingOperationSuccess('Parking started successfully'));
-      emit(ActiveParkingsLoaded(activeParkings));
+      // Don't manually reload - the stream will automatically update!
     } catch (e) {
       emit(ParkingError('Failed to start parking: $e'));
     }
   }
 
-void _onLoadParkingsByUser(LoadParkingsByUser event, Emitter<ParkingState> emit) async {
-  emit(ParkingLoading());
-  try {
-    final parkings = await parkingRepository.getParkingsByUser(event.userId);
-    emit(ParkingLoaded(parkings));
-  } catch (e) {
-    emit(ParkingError('Failed to load user parkings: $e'));
+  void _onLoadParkingsByUser(LoadParkingsByUser event, Emitter<ParkingState> emit) async {
+    emit(ParkingLoading());
+    try {
+      final parkings = await parkingRepository.getParkingsByUser(event.userId);
+      emit(ParkingLoaded(parkings));
+    } catch (e) {
+      emit(ParkingError('Failed to load user parkings: $e'));
+    }
   }
-}
+
   void _onEndParking(EndParking event, Emitter<ParkingState> emit) async {
     emit(ParkingLoading());
     try {
@@ -77,10 +85,8 @@ void _onLoadParkingsByUser(LoadParkingsByUser event, Emitter<ParkingState> emit)
       );
       
       if (success) {
-        // Reload active parkings after ending one
-        final activeParkings = await parkingRepository.getActiveParkings();
         emit(const ParkingOperationSuccess('Parking ended successfully'));
-        emit(ActiveParkingsLoaded(activeParkings));
+        // Don't manually reload - the stream will automatically update!
       } else {
         emit(const ParkingError('Failed to end parking: Parking not found'));
       }
