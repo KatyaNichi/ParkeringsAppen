@@ -34,10 +34,17 @@ import 'package:parking_app_flutter/blocs/auth/auth_bloc.dart';
 import 'package:parking_app_flutter/blocs/vehicle/vehicle_bloc.dart';
 import 'package:parking_app_flutter/blocs/parking/parking_bloc.dart';
 import 'package:parking_app_flutter/blocs/parking_space/parking_space_bloc.dart';
+import 'package:parking_app_flutter/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+ try {
+    await NotificationService().initialize();
+    print('✅ Notification service initialized successfully');
+  } catch (e) {
+    print('❌ Notification service initialization error: $e');
+    // Continue even if notifications fail - the app can still work without them
+  }
   // Initialize Firebase
   try {
     await Firebase.initializeApp(
@@ -257,3 +264,5 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
+

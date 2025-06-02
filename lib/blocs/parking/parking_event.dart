@@ -15,22 +15,24 @@ class LoadParkings extends ParkingEvent {}
 // Event to load active parkings (those without end time)
 class LoadActiveParkings extends ParkingEvent {}
 
-// Event to start a new parking
 class StartParking extends ParkingEvent {
   final String vehicleId;
   final String parkingPlaceId;
   final String startTime;
+  final String? notificationId;
+  final int? estimatedDurationHours;
 
   const StartParking({
     required this.vehicleId,
     required this.parkingPlaceId,
     required this.startTime,
+    this.notificationId,
+    this.estimatedDurationHours,
   });
 
   @override
-  List<Object?> get props => [vehicleId, parkingPlaceId, startTime];
+  List<Object?> get props => [vehicleId, parkingPlaceId, startTime, notificationId, estimatedDurationHours];
 }
-
 // Event to end a parking
 class EndParking extends ParkingEvent {
   final String parkingId;  // Changed from int to String
@@ -43,6 +45,14 @@ class EndParking extends ParkingEvent {
 
   @override
   List<Object?> get props => [parkingId, endTime];
+}
+class LoadParkingsByUser extends ParkingEvent {
+  final String userId;
+
+  const LoadParkingsByUser(this.userId);
+
+  @override
+  List<Object?> get props => [userId];
 }
 
 // Event when parkings are loaded successfully

@@ -1,4 +1,4 @@
-// lib/repositories/firestore_parking_repository.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/parking.dart';
 
@@ -6,20 +6,83 @@ class FirestoreParkingRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _collection = 'parkings';
 
-  // Add a new parking
-  Future<Parking> addParking(String fordon, String parkingPlace, String startTime, String? endTime) async {
+
+// Get parkings by user (owner of vehicles)
+Future<List<Parking>> getParkingsByUser(String userId) async {
+  try {
+    print('🔥 Getting parkings for user: $userId');
+    
+    // Get all vehicles owned by this user first
+    final vehicleSnapshot = await _firestore
+        .collection('vehicles')
+        .where('ownerId', isEqualTo: userId)
+        .get();
+    
+    final userVehicleIds = vehicleSnapshot.docs.map((doc) => doc.id).toList();
+    
+    if (userVehicleIds.isEmpty) {
+      print('⚠️ User has no vehicles, returning empty parking list');
+      return [];
+    }
+    
+    // Get parkings for these vehicles
+    final parkingSnapshot = await _firestore
+        .collection(_collection)
+        .where('fordon', whereIn: userVehicleIds)
+        .orderBy('createdAt', descending: true)
+        .get();
+    
+    final parkings = parkingSnapshot.docs.map((doc) {
+      final data = doc.data();
+      return Parking(
+        id: doc.id,
+        fordon: data['fordon'] as String,
+        parkingPlace: data['parkingPlace'] as String,
+        startTime: data['startTime'] as String?,
+        endTime: data['endTime'] as String?,
+        notificationId: data['notificationId'] as String?,
+        estimatedDurationHours: data['estimatedDurationHours'] as int?,
+      );
+    }).toList();
+    
+    print('✅ Retrieved ${parkings.length} parkings for user');
+    return parkings;
+  } catch (e) {
+    print('❌ Error getting parkings by user: $e');
+    throw Exception('Failed to load user parkings: $e');
+  }
+}
+
+// lib/repositories/firestore_parking_repository.dart (Updated addParking method)
+  
+  // Add a new parking with notification ID
+  Future<Parking> addParking(String fordon, String parkingPlace, String startTime, String? endTime, {
+    String? notificationId,
+    int? estimatedDurationHours,
+  }) async {
     try {
       print('🔥 Creating parking in Firestore');
       
-      // Create a new document with auto-generated ID
-      final docRef = await _firestore.collection(_collection).add({
+      // Create document data
+      final data = {
         'fordon': fordon,
         'parkingPlace': parkingPlace,
         'startTime': startTime,
         'endTime': endTime,
         'createdAt': FieldValue.serverTimestamp(),
         'isActive': endTime == null, // If no end time, parking is active
-      });
+      };
+      
+      // Add optional fields if provided
+      if (notificationId != null) {
+        data['notificationId'] = notificationId;
+      }
+      if (estimatedDurationHours != null) {
+        data['estimatedDurationHours'] = estimatedDurationHours;
+      }
+      
+      // Create a new document with auto-generated ID
+      final docRef = await _firestore.collection(_collection).add(data);
       
       print('✅ Parking created with ID: ${docRef.id}');
       
@@ -30,6 +93,8 @@ class FirestoreParkingRepository {
         parkingPlace: parkingPlace,
         startTime: startTime,
         endTime: endTime,
+        notificationId: notificationId,
+        estimatedDurationHours: estimatedDurationHours,
       );
     } catch (e) {
       print('❌ Error creating parking: $e');
@@ -37,7 +102,7 @@ class FirestoreParkingRepository {
     }
   }
 
-  // Get all parkings
+  // Update the getAllParkings method to read notification data
   Future<List<Parking>> getAllParkings() async {
     try {
       print('🔥 Getting all parkings from Firestore');
@@ -52,6 +117,8 @@ class FirestoreParkingRepository {
           parkingPlace: data['parkingPlace'] as String,
           startTime: data['startTime'] as String,
           endTime: data['endTime'] as String?,
+          notificationId: data['notificationId'] as String?,
+          estimatedDurationHours: data['estimatedDurationHours'] as int?,
         );
       }).toList();
       
@@ -63,7 +130,7 @@ class FirestoreParkingRepository {
     }
   }
 
-  // Get active parkings (no end time)
+  // Update getActiveParkings method
   Future<List<Parking>> getActiveParkings() async {
     try {
       print('🔥 Getting active parkings from Firestore');
@@ -81,6 +148,8 @@ class FirestoreParkingRepository {
           parkingPlace: data['parkingPlace'] as String,
           startTime: data['startTime'] as String,
           endTime: null, // Active parkings have no end time
+          notificationId: data['notificationId'] as String?,
+          estimatedDurationHours: data['estimatedDurationHours'] as int?,
         );
       }).toList();
       
@@ -91,7 +160,6 @@ class FirestoreParkingRepository {
       throw Exception('Failed to load active parkings: $e');
     }
   }
-
   // Get a parking by ID
   Future<Parking?> getParkingById(String id) async {
     try {

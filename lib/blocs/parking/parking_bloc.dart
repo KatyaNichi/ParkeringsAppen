@@ -12,6 +12,7 @@ class ParkingBloc extends Bloc<ParkingEvent, ParkingState> {
     on<LoadActiveParkings>(_onLoadActiveParkings);
     on<StartParking>(_onStartParking);
     on<EndParking>(_onEndParking);
+    on<LoadParkingsByUser>(_onLoadParkingsByUser);
   }
 
   void _onLoadParkings(LoadParkings event, Emitter<ParkingState> emit) async {
@@ -34,6 +35,9 @@ class ParkingBloc extends Bloc<ParkingEvent, ParkingState> {
     }
   }
 
+  // In lib/blocs/parking/parking_bloc.dart
+// Replace the existing _onStartParking method with this:
+
   void _onStartParking(StartParking event, Emitter<ParkingState> emit) async {
     emit(ParkingLoading());
     try {
@@ -41,7 +45,9 @@ class ParkingBloc extends Bloc<ParkingEvent, ParkingState> {
         event.vehicleId, 
         event.parkingPlaceId, 
         event.startTime, 
-        null
+        null, // endTime is null for new parkings
+        notificationId: event.notificationId,
+        estimatedDurationHours: event.estimatedDurationHours,
       );
       
       // Load all active parkings after starting a new one
@@ -53,6 +59,15 @@ class ParkingBloc extends Bloc<ParkingEvent, ParkingState> {
     }
   }
 
+void _onLoadParkingsByUser(LoadParkingsByUser event, Emitter<ParkingState> emit) async {
+  emit(ParkingLoading());
+  try {
+    final parkings = await parkingRepository.getParkingsByUser(event.userId);
+    emit(ParkingLoaded(parkings));
+  } catch (e) {
+    emit(ParkingError('Failed to load user parkings: $e'));
+  }
+}
   void _onEndParking(EndParking event, Emitter<ParkingState> emit) async {
     emit(ParkingLoading());
     try {
