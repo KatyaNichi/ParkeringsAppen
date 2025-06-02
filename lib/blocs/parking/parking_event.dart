@@ -15,8 +15,15 @@ class LoadParkings extends ParkingEvent {}
 // Event to load active parkings (those without end time)
 class LoadActiveParkings extends ParkingEvent {}
 
-// NEW EVENT: Event to load active parkings as a stream (real-time)
-class LoadActiveParkingsStream extends ParkingEvent {}
+class LoadActiveParkingsStream extends ParkingEvent {
+  const LoadActiveParkingsStream();
+  
+  @override
+  List<Object?> get props => [];
+  
+  @override
+  String toString() => 'LoadActiveParkingsStream()';
+}
 
 // Event to start a new parking
 class StartParking extends ParkingEvent {

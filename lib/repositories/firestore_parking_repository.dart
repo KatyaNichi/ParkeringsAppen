@@ -37,15 +37,13 @@ Future<List<Parking>> getParkingsByUser(String userId) async {
   }
 }
   
-  // Add a new parking with notification ID
-  Future<Parking> addParking(String fordon, String parkingPlace, String startTime, String? endTime, {
+ Future<Parking> addParking(String fordon, String parkingPlace, String startTime, String? endTime, {
   String? notificationId,
   int? estimatedDurationHours,
 }) async {
   try {
     print('🔥 Creating parking in Firestore');
     
-    // Create a new document with auto-generated ID
     final docRef = await _firestore.collection(_collection).add({
       'fordon': fordon,
       'parkingPlace': parkingPlace,
@@ -59,7 +57,6 @@ Future<List<Parking>> getParkingsByUser(String userId) async {
     
     print('✅ Parking created with ID: ${docRef.id}');
     
-    // Return the created parking with the generated ID
     return Parking(
       id: docRef.id,
       fordon: fordon,
@@ -78,90 +75,33 @@ Future<List<Parking>> getParkingsByUser(String userId) async {
 
   // Update the getAllParkings method to read notification data
   Future<List<Parking>> getAllParkings() async {
-    try {
-      print('🔥 Getting all parkings from Firestore');
+  try {
+    print('🔥 Getting all parkings from Firestore');
+    
+    final snapshot = await _firestore.collection(_collection).get();
+    
+    final parkings = snapshot.docs.map((doc) {
+      final data = doc.data();
       
-      final snapshot = await _firestore.collection(_collection).get();
-      
-      final parkings = snapshot.docs.map((doc) {
-        final data = doc.data();
-        return Parking(
-          id: doc.id,
-          fordon: data['fordon'] as String,
-          parkingPlace: data['parkingPlace'] as String,
-          startTime: data['startTime'] as String,
-          endTime: data['endTime'] as String?,
-          notificationId: data['notificationId'] as String?,
-          estimatedDurationHours: data['estimatedDurationHours'] as int?,
-        );
-      }).toList();
-      
-      print('✅ Retrieved ${parkings.length} parkings');
-      return parkings;
-    } catch (e) {
-      print('❌ Error getting parkings: $e');
-      throw Exception('Failed to load parkings: $e');
-    }
-  }
-
-  // Update getActiveParkings method
-  Future<List<Parking>> getActiveParkings() async {
-    try {
-      print('🔥 Getting active parkings from Firestore');
-      
-      final snapshot = await _firestore
-          .collection(_collection)
-          .where('isActive', isEqualTo: true)
-          .get();
-      
-      final activeParkings = snapshot.docs.map((doc) {
-        final data = doc.data();
-        return Parking(
-          id: doc.id,
-          fordon: data['fordon'] as String,
-          parkingPlace: data['parkingPlace'] as String,
-          startTime: data['startTime'] as String,
-          endTime: null, // Active parkings have no end time
-          notificationId: data['notificationId'] as String?,
-          estimatedDurationHours: data['estimatedDurationHours'] as int?,
-        );
-      }).toList();
-      
-      print('✅ Retrieved ${activeParkings.length} active parkings');
-      return activeParkings;
-    } catch (e) {
-      print('❌ Error getting active parkings: $e');
-      throw Exception('Failed to load active parkings: $e');
-    }
-  }
-  // Get a parking by ID
-  Future<Parking?> getParkingById(String id) async {
-    try {
-      print('🔥 Getting parking by ID: $id');
-      
-      final doc = await _firestore.collection(_collection).doc(id).get();
-      
-      if (!doc.exists) {
-        print('⚠️ Parking not found: $id');
-        return null;
-      }
-      
-      final data = doc.data()!;
-      final parking = Parking(
+      // Safe null handling
+      return Parking(
         id: doc.id,
-        fordon: data['fordon'] as String,
-        parkingPlace: data['parkingPlace'] as String,
-        startTime: data['startTime'] as String,
+        fordon: data['fordon'] as String? ?? 'unknown',
+        parkingPlace: data['parkingPlace'] as String? ?? 'unknown',
+        startTime: data['startTime'] as String?,
         endTime: data['endTime'] as String?,
+        notificationId: data['notificationId'] as String?,
+        estimatedDurationHours: data['estimatedDurationHours'] as int?,
       );
-      
-      print('✅ Parking found');
-      return parking;
-    } catch (e) {
-      print('❌ Error getting parking: $e');
-      throw Exception('Failed to load parking: $e');
-    }
+    }).toList();
+    
+    print('✅ Retrieved ${parkings.length} parkings');
+    return parkings;
+  } catch (e) {
+    print('❌ Error getting parkings: $e');
+    throw Exception('Failed to load parkings: $e');
   }
+}
 
   // Get parkings by vehicle
   Future<List<Parking>> getParkingsByVehicle(String fordon) async {
@@ -281,46 +221,59 @@ Future<List<Parking>> getParkingsByUser(String userId) async {
       return false;
     }
   }
-
-  // Get active parkings stream - for real-time updates
-  Stream<List<Parking>> getActiveParkingsStream() {
-    return _firestore
+Future<List<Parking>> getActiveParkings() async {
+  try {
+    print('🔥 Getting active parkings from Firestore (one-time load)');
+    
+    final snapshot = await _firestore
         .collection(_collection)
         .where('isActive', isEqualTo: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs.map((doc) {
-            final data = doc.data();
-            return Parking(
-              id: doc.id,
-              fordon: data['fordon'] as String,
-              parkingPlace: data['parkingPlace'] as String,
-              startTime: data['startTime'] as String,
-              endTime: null,
-            );
-          }).toList();
-        });
-  }
-
-  // Get parking history for a vehicle - for real-time updates
-  Stream<List<Parking>> getParkingHistoryStream(String fordon) {
-    return _firestore
-        .collection(_collection)
-        .where('fordon', isEqualTo: fordon)
-        .where('isActive', isEqualTo: false)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs.map((doc) {
-            final data = doc.data();
-            return Parking(
-              id: doc.id,
-              fordon: data['fordon'] as String,
-              parkingPlace: data['parkingPlace'] as String,
-              startTime: data['startTime'] as String,
-              endTime: data['endTime'] as String?,
-            );
-          }).toList();
-        });
+        .get();
+    
+    final activeParkings = snapshot.docs.map((doc) {
+      final data = doc.data();
+      return Parking(
+        id: doc.id,
+        fordon: data['fordon'] as String? ?? 'unknown',
+        parkingPlace: data['parkingPlace'] as String? ?? 'unknown',
+        startTime: data['startTime'] as String?,
+        endTime: null, // Active parkings have no end time
+        notificationId: data['notificationId'] as String?,
+        estimatedDurationHours: data['estimatedDurationHours'] as int?,
+      );
+    }).toList();
+    
+    print('✅ Retrieved ${activeParkings.length} active parkings (one-time)');
+    return activeParkings;
+  } catch (e) {
+    print('❌ Error getting active parkings: $e');
+    throw Exception('Failed to load active parkings: $e');
   }
 }
+  // Get active parkings stream - for real-time updates
+  Stream<List<Parking>> getActiveParkingsStream() {
+  print('🔥 Creating active parkings stream...');
+  
+  return _firestore
+      .collection(_collection)
+      .where('isActive', isEqualTo: true)
+      .snapshots()
+      .map((snapshot) {
+        print('📱 Stream snapshot received: ${snapshot.docs.length} documents');
+        
+        return snapshot.docs.map((doc) {
+          final data = doc.data();
+          print('   - Document ${doc.id}: ${data['fordon']} at ${data['parkingPlace']}');
+          
+          return Parking(
+            id: doc.id,
+            fordon: data['fordon'] as String? ?? 'unknown',
+            parkingPlace: data['parkingPlace'] as String? ?? 'unknown',
+            startTime: data['startTime'] as String?,
+            endTime: null, // Active parkings have no end time
+            notificationId: data['notificationId'] as String?,
+            estimatedDurationHours: data['estimatedDurationHours'] as int?,
+          );
+        }).toList();
+      });
+}}

@@ -104,39 +104,48 @@ Future<void> _loadDataWithStreams() async {
     });
   }
 }
+// In your parkings_screen.dart, find the _loadData method and replace it with this:
+
 Future<void> _loadData() async {
+  print('🚀 LOAD_DATA: Starting _loadData method');
+  
   setState(() {
     _isLoading = true;
     _errorMessage = '';
   });
 
   try {
-    // Get the current user
     final currentUser = UserService().currentUser;
     if (currentUser != null) {
-      // Load user vehicles
+      print('🚀 LOAD_DATA: Loading vehicles for user ${currentUser.id}');
       context.read<VehicleBloc>().add(LoadVehiclesByOwner(currentUser.id));
     }
 
-    // Load parking spaces
+    print('🚀 LOAD_DATA: Loading parking spaces');
     context.read<ParkingSpaceBloc>().add(LoadParkingSpaces());
 
-    // 🔥 NEW: Use stream for real-time active parkings
+    // 🔥 IMPORTANT: Use STREAM instead of one-time load
+    print('🚀 LOAD_DATA: 🔥 DISPATCHING LoadActiveParkingsStream event');
     context.read<ParkingBloc>().add(LoadActiveParkingsStream());
 
-    // Load all parkings (for history)
-    context.read<ParkingBloc>().add(LoadParkings());
+    // DON'T load all parkings for now (it's causing the error)
+    // context.read<ParkingBloc>().add(LoadParkings());
+    print('🚀 LOAD_DATA: Skipping LoadParkings due to data error');
 
     setState(() {
       _isLoading = false;
     });
+    
+    print('🚀 LOAD_DATA: Finished loading data');
   } catch (e) {
+    print('❌ LOAD_DATA ERROR: $e');
     setState(() {
       _errorMessage = 'Ett fel uppstod: $e';
       _isLoading = false;
     });
   }
 }
+ 
 
   // End a parking and cancel its notification
   Future<void> _endParking(Parking parking) async {
