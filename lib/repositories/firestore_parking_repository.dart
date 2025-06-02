@@ -7,32 +7,16 @@ class FirestoreParkingRepository {
   final String _collection = 'parkings';
 
 
-// Get parkings by user (owner of vehicles)
 Future<List<Parking>> getParkingsByUser(String userId) async {
   try {
     print('🔥 Getting parkings for user: $userId');
     
-    // Get all vehicles owned by this user first
-    final vehicleSnapshot = await _firestore
-        .collection('vehicles')
-        .where('ownerId', isEqualTo: userId)
-        .get();
-    
-    final userVehicleIds = vehicleSnapshot.docs.map((doc) => doc.id).toList();
-    
-    if (userVehicleIds.isEmpty) {
-      print('⚠️ User has no vehicles, returning empty parking list');
-      return [];
-    }
-    
-    // Get parkings for these vehicles
-    final parkingSnapshot = await _firestore
+    final snapshot = await _firestore
         .collection(_collection)
-        .where('fordon', whereIn: userVehicleIds)
-        .orderBy('createdAt', descending: true)
+        .where('fordon', isEqualTo: userId) // Assuming fordon field stores user ID
         .get();
     
-    final parkings = parkingSnapshot.docs.map((doc) {
+    final parkings = snapshot.docs.map((doc) {
       final data = doc.data();
       return Parking(
         id: doc.id,
@@ -49,58 +33,48 @@ Future<List<Parking>> getParkingsByUser(String userId) async {
     return parkings;
   } catch (e) {
     print('❌ Error getting parkings by user: $e');
-    throw Exception('Failed to load user parkings: $e');
+    throw Exception('Failed to load parkings by user: $e');
   }
 }
-
-// lib/repositories/firestore_parking_repository.dart (Updated addParking method)
   
   // Add a new parking with notification ID
   Future<Parking> addParking(String fordon, String parkingPlace, String startTime, String? endTime, {
-    String? notificationId,
-    int? estimatedDurationHours,
-  }) async {
-    try {
-      print('🔥 Creating parking in Firestore');
-      
-      // Create document data
-      final data = {
-        'fordon': fordon,
-        'parkingPlace': parkingPlace,
-        'startTime': startTime,
-        'endTime': endTime,
-        'createdAt': FieldValue.serverTimestamp(),
-        'isActive': endTime == null, // If no end time, parking is active
-      };
-      
-      // Add optional fields if provided
-      if (notificationId != null) {
-        data['notificationId'] = notificationId;
-      }
-      if (estimatedDurationHours != null) {
-        data['estimatedDurationHours'] = estimatedDurationHours;
-      }
-      
-      // Create a new document with auto-generated ID
-      final docRef = await _firestore.collection(_collection).add(data);
-      
-      print('✅ Parking created with ID: ${docRef.id}');
-      
-      // Return the created parking with the generated ID
-      return Parking(
-        id: docRef.id,
-        fordon: fordon,
-        parkingPlace: parkingPlace,
-        startTime: startTime,
-        endTime: endTime,
-        notificationId: notificationId,
-        estimatedDurationHours: estimatedDurationHours,
-      );
-    } catch (e) {
-      print('❌ Error creating parking: $e');
-      throw Exception('Failed to create parking: $e');
-    }
+  String? notificationId,
+  int? estimatedDurationHours,
+}) async {
+  try {
+    print('🔥 Creating parking in Firestore');
+    
+    // Create a new document with auto-generated ID
+    final docRef = await _firestore.collection(_collection).add({
+      'fordon': fordon,
+      'parkingPlace': parkingPlace,
+      'startTime': startTime,
+      'endTime': endTime,
+      'notificationId': notificationId,
+      'estimatedDurationHours': estimatedDurationHours,
+      'createdAt': FieldValue.serverTimestamp(),
+      'isActive': endTime == null, // If no end time, parking is active
+    });
+    
+    print('✅ Parking created with ID: ${docRef.id}');
+    
+    // Return the created parking with the generated ID
+    return Parking(
+      id: docRef.id,
+      fordon: fordon,
+      parkingPlace: parkingPlace,
+      startTime: startTime,
+      endTime: endTime,
+      notificationId: notificationId,
+      estimatedDurationHours: estimatedDurationHours,
+    );
+  } catch (e) {
+    print('❌ Error creating parking: $e');
+    throw Exception('Failed to create parking: $e');
   }
+}
+
 
   // Update the getAllParkings method to read notification data
   Future<List<Parking>> getAllParkings() async {

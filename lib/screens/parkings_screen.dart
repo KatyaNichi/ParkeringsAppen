@@ -44,32 +44,66 @@ class _ParkingsScreenState extends State<ParkingsScreen>
 
   final NotificationService _notificationService = NotificationService();
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    
-    // Check if user is logged in
-    final currentUser = UserService().currentUser;
-    if (currentUser == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ingen användare inloggad. Logga in igen.'),
-            duration: Duration(seconds: 3),
-          ),
-        );
-        
-        // Redirect to login
-        Navigator.pushReplacementNamed(context, '/');
-      });
-      return;
-    }
-    
-    // Load data
-    _loadData();
+@override
+void initState() {
+  super.initState();
+  _tabController = TabController(length: 2, vsync: this);
+  
+  // Check if user is logged in
+  final currentUser = UserService().currentUser;
+  if (currentUser == null) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ingen användare inloggad. Logga in igen.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      
+      // Redirect to login
+      Navigator.pushReplacementNamed(context, '/');
+    });
+    return;
   }
+  
+  // Start real-time data streams instead of one-time loads
+  _loadDataWithStreams();
+}
 
+// Replace the old _loadData method with this new one:
+Future<void> _loadDataWithStreams() async {
+  setState(() {
+    _isLoading = true;
+    _errorMessage = '';
+  });
+
+  try {
+    // Get the current user
+    final currentUser = UserService().currentUser;
+    if (currentUser != null) {
+      // Load user vehicles (one-time load for now, can be converted to stream later)
+      context.read<VehicleBloc>().add(LoadVehiclesByOwner(currentUser.id));
+    }
+
+    // Load parking spaces (one-time load for now)
+    context.read<ParkingSpaceBloc>().add(LoadParkingSpaces());
+
+    // 🔥 REAL-TIME: Start listening to active parkings stream
+    context.read<ParkingBloc>().add(LoadActiveParkingsStream());
+
+    // Load all parkings for history (one-time load)
+    context.read<ParkingBloc>().add(LoadParkings());
+
+    setState(() {
+      _isLoading = false;
+    });
+  } catch (e) {
+    setState(() {
+      _errorMessage = 'Ett fel uppstod: $e';
+      _isLoading = false;
+    });
+  }
+}
 Future<void> _loadData() async {
   setState(() {
     _isLoading = true;
@@ -77,20 +111,21 @@ Future<void> _loadData() async {
   });
 
   try {
+    // Get the current user
     final currentUser = UserService().currentUser;
     if (currentUser != null) {
       // Load user vehicles
       context.read<VehicleBloc>().add(LoadVehiclesByOwner(currentUser.id));
-      
-      // Load user's parking history (instead of all parkings)
-      context.read<ParkingBloc>().add(LoadParkingsByUser(currentUser.id));
     }
 
     // Load parking spaces
     context.read<ParkingSpaceBloc>().add(LoadParkingSpaces());
 
-    // Load active parkings (these should also be filtered by user)
-    context.read<ParkingBloc>().add(LoadActiveParkings());
+    // 🔥 NEW: Use stream for real-time active parkings
+    context.read<ParkingBloc>().add(LoadActiveParkingsStream());
+
+    // Load all parkings (for history)
+    context.read<ParkingBloc>().add(LoadParkings());
 
     setState(() {
       _isLoading = false;
@@ -285,43 +320,45 @@ Future<void> _loadData() async {
     }
   }
 
-  // Tab for displaying active parkings with notification features
-  Widget _buildActiveParkingsTab() {
-    return RefreshIndicator(
-      onRefresh: () async {
-        context.read<ParkingBloc>().add(LoadActiveParkings());
-      },
-      child: _activeParkings.isEmpty
-          ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.local_parking,
-                  size: 64,
-                  color: Colors.grey,
+ Widget _buildActiveParkingsTab() {
+  return RefreshIndicator(
+    onRefresh: () async {
+      // OLD WAY: context.read<ParkingBloc>().add(LoadActiveParkings());
+      
+      // NEW WAY: Restart the real-time stream
+      context.read<ParkingBloc>().add(LoadActiveParkingsStream());
+    },
+    child: _activeParkings.isEmpty
+        ? Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.local_parking,
+                size: 64,
+                color: Colors.grey,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Du har inga aktiva parkeringar',
+                style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0078D7),
+                  foregroundColor: Colors.white,
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Du har inga aktiva parkeringar',
-                  style: TextStyle(fontSize: 16),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0078D7),
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: () {
-                    // Navigate to parking spaces to start a new parking
-                    _tabController.animateTo(0);
-                  },
-                  child: const Text('Hitta parkeringsplats'),
-                ),
-              ],
-            ),
-          )
-          : ListView.builder(
+                onPressed: () {
+                  // Navigate to parking spaces to start a new parking
+                  _tabController.animateTo(0);
+                },
+                child: const Text('Hitta parkeringsplats'),
+              ),
+            ],
+          ),
+        )
+        : ListView.builder(
             itemCount: _activeParkings.length,
             itemBuilder: (context, index) {
               final parking = _activeParkings[index];
